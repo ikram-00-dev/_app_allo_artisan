@@ -1,59 +1,54 @@
 import 'package:intl/intl.dart';
 
 class Message {
-  final int idMessage;
-  final String text;
-  final DateTime timestamp;
-  final bool isSentToClient;
-  final bool seen;
+  final int id;
   final int contactId;
+  final int senderId;
+  final String text;
+  final DateTime createdAt;
+  final bool seen;
 
   Message({
-    required this.idMessage,
-    required this.text,
-    required this.timestamp,
-    required this.isSentToClient,
-    required this.seen,
+    required this.id,
     required this.contactId,
+    required this.senderId,
+    required this.text,
+    required this.createdAt,
+    required this.seen,
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
-      idMessage: json['id_message'] ?? json['IDMessage'] ?? 0,
-      text: json['text'] ?? '',
-      timestamp: DateTime.tryParse(json['timestamp'] ?? '') ?? DateTime.now(),
-      isSentToClient: json['is_sent_to_client'] ?? false,
-      seen: json['seen'] ?? false,
-      contactId: json['contact_id'] ?? 0,
+      id: json['ID'] ?? json['id'] ?? 0,
+      contactId: json['ContactID'] ?? json['contactId'] ?? 0,
+      senderId: json['SenderID'] ?? json['senderId'] ?? 0,
+      text: json['Text'] ?? json['text'] ?? '',
+      createdAt: DateTime.tryParse(json['CreatedAt'] ?? json['createdAt'] ?? '') ?? DateTime.now(),
+      seen: json['Seen'] ?? json['seen'] ?? false,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'text': text,
-      'timestamp': timestamp.toIso8601String(),
-      'is_sent_to_client': isSentToClient,
+      'contactId': contactId,
+      'senderId': senderId,
       'seen': seen,
-      'contact_id': contactId,
     };
   }
 
-  bool isSentByCurrentUser(bool isArtisan) {
-    if (isArtisan) {
-      return isSentToClient;
-    } else {
-      return !isSentToClient;
-    }
+  bool isSentByCurrentUser(bool isArtisan, int currentUserId) {
+    return senderId == currentUserId;
   }
 
   String get formattedTime {
     final now = DateTime.now();
-    if (timestamp.day == now.day && timestamp.month == now.month) {
-      return DateFormat('HH:mm').format(timestamp);
-    } else if (timestamp.difference(now).inDays > -7) {
-      return DateFormat('EEE', 'fr_FR').format(timestamp);
+    if (createdAt.day == now.day && createdAt.month == now.month) {
+      return DateFormat('HH:mm').format(createdAt);
+    } else if (createdAt.difference(now).inDays > -7) {
+      return DateFormat('EEE', 'fr_FR').format(createdAt);
     } else {
-      return DateFormat('dd/MM', 'fr_FR').format(timestamp);
+      return DateFormat('dd/MM', 'fr_FR').format(createdAt);
     }
   }
 }

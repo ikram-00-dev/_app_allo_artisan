@@ -21,13 +21,13 @@ class PostModel {
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
     return PostModel(
-      idPost: json['id_post'] ?? json['IDPost'] ?? 0,
-      content: json['content'] ?? '',
-      approvalStatus: json['approval_status'] ?? 'pending',
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
-      image: json['image'] ?? '',
-      artisanId: json['artisan_id'] ?? 0,
-      artisan: json['artisan'] != null ? Artisan.fromJson(json['artisan']) : null,
+      idPost: json['IDPost'] ?? json['idPost'] ?? 0,
+      content: json['Content'] ?? json['content'] ?? '',
+      approvalStatus: json['ApprovalStatus'] ?? json['approvalStatus'] ?? 'pending',
+      createdAt: DateTime.tryParse(json['CreatedAt'] ?? json['createdAt'] ?? '') ?? DateTime.now(),
+      image: json['Image'] ?? json['image'] ?? '',
+      artisanId: json['ArtisanID'] ?? json['artisanId'] ?? 0,
+      artisan: json['Artisan'] != null ? Artisan.fromJson(json['Artisan']) : null,
     );
   }
 

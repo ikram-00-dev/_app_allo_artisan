@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../models/client.dart';
-import '../../models/artisan_model.dart';
+import '../../models/artisan.dart';
+import '../../models/user.dart';
 
 class ClientProfileScreen extends StatefulWidget {
   final Client client;
@@ -25,42 +26,68 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
   bool showFollowing = false;
 
   // =========================================================
-  // MOCK FOLLOWING LIST
+  // MOCK FOLLOWING LIST - Updated to match new Artisan model
   // =========================================================
   final List<Artisan> following = [
     Artisan(
       user: User(
         idUser: 1,
-        username: "Jean Dupont",
+        firstName: "Jean",
+        middleName: "",
+        lastName: "Dupont",
+        username: "jean.dupont",
         email: "jean@test.com",
+        phoneNumber: "0555000000",
         password: "",
         creationDate: DateTime.now(),
-        phoneNumber: "0555000000",
+        avatarUrl: "",
+        role: "artisan",
       ),
-      location: "Paris",
+      status: "active",
+      isAvailable: true,
       category: "Plomberie",
       activesStatus: "active",
       diploma: "CAP",
       bio: "Professional plumber",
+      province: "Île-de-France",
+      city: "Paris",
+      district: "15ème",
+      latitude: null,
+      longitude: null,
+      experience: 5,
       rating: 4.8,
       reviewCount: 120,
+      followers: null,
     ),
     Artisan(
       user: User(
         idUser: 2,
-        username: "Marie Martin",
+        firstName: "Marie",
+        middleName: "",
+        lastName: "Martin",
+        username: "marie.martin",
         email: "marie@test.com",
+        phoneNumber: "0666000000",
         password: "",
         creationDate: DateTime.now(),
-        phoneNumber: "0666000000",
+        avatarUrl: "",
+        role: "artisan",
       ),
-      location: "Lyon",
-      category: "Electrician",
+      status: "active",
+      isAvailable: true,
+      category: "Électricité",
       activesStatus: "active",
       diploma: "BTS",
       bio: "Electric specialist",
+      province: "Auvergne-Rhône-Alpes",
+      city: "Lyon",
+      district: "3ème",
+      latitude: null,
+      longitude: null,
+      experience: 7,
       rating: 4.5,
       reviewCount: 85,
+      followers: null,
     ),
   ];
 
@@ -76,7 +103,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
         backgroundColor: Colors.white,
         centerTitle: true,
         title: Text(
-          widget.isPrivate ? "My Profile" : "Client Profile",
+          widget.isPrivate ? "Mon Profil" : "Profil Client",
           style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -127,8 +154,16 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                 radius: 40,
                 backgroundColor: Colors.blue.shade100,
                 backgroundImage: NetworkImage(
-                  "https://i.pravatar.cc/300?img=${client.id}",
+                  client.avatarUrl.isNotEmpty
+                      ? client.avatarUrl
+                      : "https://i.pravatar.cc/300?img=${client.id}",
                 ),
+                child: client.avatarUrl.isEmpty
+                    ? Text(
+                  client.name.isNotEmpty ? client.name[0].toUpperCase() : "C",
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                )
+                    : null,
               ),
 
               const SizedBox(width: 16),
@@ -150,7 +185,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                             ),
                           ),
                         ),
-
                         // VERIFIED ICON
                         Container(
                           padding: const EdgeInsets.all(4),
@@ -166,9 +200,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 10),
-
                     // EMAIL
                     Row(
                       children: [
@@ -190,9 +222,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 8),
-
                     // PHONE
                     Row(
                       children: [
@@ -211,9 +241,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 8),
-
                     // ID
                     Row(
                       children: [
@@ -243,7 +271,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
           // =====================================================
           if (widget.isPrivate) ...[
             const SizedBox(height: 20),
-
             Row(
               children: [
                 Expanded(
@@ -251,7 +278,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                     onPressed: () {
                       Get.toNamed('/settings');
                     },
-
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -260,22 +286,19 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-
                     icon: const Icon(Icons.settings),
-                    label: const Text("Settings"),
+                    label: const Text("Paramètres"),
                   ),
                 ),
               ],
             ),
           ] else ...[
             const SizedBox(height: 20),
-
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {},
-
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
@@ -284,7 +307,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-
                     icon: const Icon(Icons.message),
                     label: const Text("Message"),
                   ),
@@ -310,15 +332,12 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
               showFollowing = !showFollowing;
             });
           },
-
           child: Container(
             padding: const EdgeInsets.all(16),
-
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
             ),
-
             child: Row(
               children: [
                 Container(
@@ -333,25 +352,21 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                     color: Colors.pink.shade600,
                   ),
                 ),
-
                 const SizedBox(width: 14),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "Following",
+                        "Abonnements",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
                       ),
-
                       const SizedBox(height: 4),
-
                       Text(
-                        "${following.length} artisans followed",
+                        "${following.length} artisans suivis",
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 12,
@@ -360,7 +375,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                     ],
                   ),
                 ),
-
                 Icon(
                   showFollowing
                       ? Icons.keyboard_arrow_down
@@ -377,44 +391,44 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
         // =====================================================
         if (showFollowing) ...[
           const SizedBox(height: 12),
-
           Container(
             padding: const EdgeInsets.all(16),
-
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
             ),
-
             child: Column(
               children: following.map((artisan) {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 14),
-
                   child: Row(
                     children: [
                       CircleAvatar(
                         radius: 24,
                         backgroundImage: NetworkImage(
-                          "https://i.pravatar.cc/150?img=${artisan.id}",
+                          artisan.avatarUrl.isNotEmpty
+                              ? artisan.avatarUrl
+                              : "https://i.pravatar.cc/150?img=${artisan.id}",
                         ),
+                        child: artisan.avatarUrl.isEmpty
+                            ? Text(
+                          artisan.fullName.isNotEmpty ? artisan.fullName[0].toUpperCase() : "A",
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        )
+                            : null,
                       ),
-
                       const SizedBox(width: 12),
-
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              artisan.name,
+                              artisan.fullName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-
                             const SizedBox(height: 4),
-
                             Text(
                               artisan.category,
                               style: TextStyle(
@@ -425,15 +439,13 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                           ],
                         ),
                       ),
-
                       ElevatedButton(
                         onPressed: () {
                           Get.toNamed(
                             "/artisan-profile",
-                            arguments: artisan,
+                            arguments: artisan.id,
                           );
                         },
-
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
@@ -441,8 +453,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-
-                        child: const Text("View"),
+                        child: const Text("Voir"),
                       ),
                     ],
                   ),

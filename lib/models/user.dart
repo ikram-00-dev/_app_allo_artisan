@@ -1,18 +1,21 @@
-enum UserRole { client, artisan, administrator }
-
 class User {
   final int idUser;
+  final String firstName;
+  final String middleName;
+  final String lastName;
   final String username;
   final String email;
   final String phoneNumber;
   final String password;
   final DateTime creationDate;
-  String avatarUrl;  // ← ADD THIS
-
-  UserRole? role;
+  String avatarUrl;
+  dynamic role;
 
   User({
     required this.idUser,
+    required this.firstName,
+    required this.middleName,
+    required this.lastName,
     required this.username,
     required this.email,
     required this.phoneNumber,
@@ -24,39 +27,31 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      idUser: json['id'] ?? json['ID'] ?? 0,
-      username: json['username'] ?? '',
-      email: json['email'] ?? '',
-      phoneNumber: json['phone_number'] ?? '',
-      password: json[''],
-      creationDate: DateTime.tryParse(json['creation_date'] ?? '') ?? DateTime.now(),
-      role: _parseRole(json['role']),
+      idUser: json['ID'] ?? json['id'] ?? 0,
+      firstName: json['FirstName'] ?? json['firstName'] ?? '',
+      middleName: json['MiddleName'] ?? json['middleName'] ?? '',
+      lastName: json['LastName'] ?? json['lastName'] ?? '',
+      username: json['Username'] ?? json['username'] ?? '',
+      email: json['Email'] ?? json['email'] ?? '',
+      phoneNumber: json['PhoneNumber'] ?? json['phoneNumber'] ?? '',
+      password: '',
+      creationDate: DateTime.tryParse(json['CreationDate'] ?? json['creationDate'] ?? '') ?? DateTime.now(),
+      avatarUrl: json['AvatarURL'] ?? json['avatarUrl'] ?? '',
+      role: json['Role'] ?? json['role'],
     );
   }
 
-  static UserRole? _parseRole(dynamic role) {
-    if (role == null) return null;
-    final roleStr = role.toString().toLowerCase();
-    switch (roleStr) {
-      case 'client':
-        return UserRole.client;
-      case 'artisan':
-        return UserRole.artisan;
-      case 'administrator':
-        return UserRole.administrator;
-      default:
-        return null;
-    }
-  }
+  String get fullName => '$firstName $lastName'.trim();
 
   Map<String, dynamic> toJson() {
     return {
       'id': idUser,
+      'firstName': firstName,
+      'lastName': lastName,
       'username': username,
       'email': email,
-      'phone_number': phoneNumber,
-      'creation_date': creationDate.toIso8601String(),
-
+      'phoneNumber': phoneNumber,
+      'avatarUrl': avatarUrl,
     };
   }
 }

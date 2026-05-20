@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../controllers/reservation_controller.dart';
-import '../models/appointment.dart';
+import '/controllers/reservation_controller.dart';
+import '/models/appointment.dart';
 
 class ReservationScreen extends StatelessWidget {
   ReservationScreen({super.key});

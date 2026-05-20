@@ -14,18 +14,19 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
   final auth = Get.find<AuthController>();
   int step = 1;
 
-  // Form controllers
+  // Form controllers - Updated to match backend fields
   final firstName = TextEditingController();
   final lastName = TextEditingController();
+  final username = TextEditingController();
   final email = TextEditingController();
   final password = TextEditingController();
-  final phone = TextEditingController();
-  final wilaya = TextEditingController();
-  final baladya = TextEditingController();
+  final phoneNumber = TextEditingController();
+  final province = TextEditingController();  // Wilaya
+  final city = TextEditingController();      // Baladeya
+  final district = TextEditingController();  // Zone
   final category = TextEditingController();
   final diploma = TextEditingController();
-  final bio = TextEditingController();
-  final zone = TextEditingController();
+  final experience = TextEditingController(); // Optional
 
   void next() {
     if (step < 3) {
@@ -42,18 +43,24 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
   }
 
   void submit() async {
+    // Generate username from first and last name if not provided
+    final String finalUsername = username.text.isNotEmpty
+        ? username.text
+        : '${firstName.text.toLowerCase()}_${lastName.text.toLowerCase()}';
+
     final success = await auth.registerArtisan(
       firstName: firstName.text,
       lastName: lastName.text,
+      username: finalUsername,
       email: email.text,
       password: password.text,
-      phone: phone.text,
+      phoneNumber: phoneNumber.text,
       category: category.text,
-      wilaya: wilaya.text,
-      baladeya: baladya.text,
-      zone: zone.text,
-      diploma: diploma.text,
-      bio: bio.text,
+      province: province.text,
+      city: city.text,
+      district: district.text,
+      diploma: diploma.text.isNotEmpty ? diploma.text : null,
+      experience: experience.text.isNotEmpty ? int.tryParse(experience.text) : null,
     );
 
     if (success) {
@@ -64,7 +71,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Register Artisan")),
+      appBar: AppBar(title: const Text("Inscription Artisan")),
       body: Obx(() {
         if (auth.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
@@ -91,14 +98,14 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey,
                         ),
-                        child: const Text("Back"),
+                        child: const Text("Retour"),
                       ),
                     ),
                   if (step > 1) const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: next,
-                      child: Text(step == 3 ? "Submit" : "Next"),
+                      child: Text(step == 3 ? "S'inscrire" : "Suivant"),
                     ),
                   ),
                 ],
@@ -113,17 +120,19 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
   Widget step1() {
     return ListView(
       children: [
-        _buildTextField(firstName, "First Name", Icons.person),
+        _buildTextField(firstName, "Prénom", Icons.person),
         const SizedBox(height: 12),
-        _buildTextField(lastName, "Last Name", Icons.person_outline),
+        _buildTextField(lastName, "Nom", Icons.person_outline),
         const SizedBox(height: 12),
-        _buildTextField(category, "Category (e.g., Plomberie)", Icons.work),
+        _buildTextField(username, "Nom d'utilisateur (optionnel)", Icons.account_circle),
         const SizedBox(height: 12),
-        _buildTextField(wilaya, "Wilaya (City)", Icons.location_city),
+        _buildTextField(category, "Catégorie (ex: Plomberie)", Icons.work),
         const SizedBox(height: 12),
-        _buildTextField(baladya, "Baladeya (District)", Icons.location_on),
+        _buildTextField(province, "Wilaya", Icons.location_city),
         const SizedBox(height: 12),
-        _buildTextField(zone, "Zone", Icons.map),
+        _buildTextField(city, "Baladeya (Commune)", Icons.location_on),
+        const SizedBox(height: 12),
+        _buildTextField(district, "Zone", Icons.map),
       ],
     );
   }
@@ -131,9 +140,9 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
   Widget step2() {
     return ListView(
       children: [
-        _buildTextField(diploma, "Diploma / Certification", Icons.school, maxLines: 2),
+        _buildTextField(diploma, "Diplôme / Certification (optionnel)", Icons.school, maxLines: 2),
         const SizedBox(height: 12),
-        _buildTextField(bio, "Bio / Description", Icons.description, maxLines: 4),
+        _buildTextField(experience, "Années d'expérience (optionnel)", Icons.work_history, keyboardType: TextInputType.number),
       ],
     );
   }
@@ -143,9 +152,9 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
       children: [
         _buildTextField(email, "Email", Icons.email, keyboardType: TextInputType.emailAddress),
         const SizedBox(height: 12),
-        _buildTextField(phone, "Phone Number", Icons.phone, keyboardType: TextInputType.phone),
+        _buildTextField(phoneNumber, "Numéro de téléphone", Icons.phone, keyboardType: TextInputType.phone),
         const SizedBox(height: 12),
-        _buildTextField(password, "Password", Icons.lock, obscure: true),
+        _buildTextField(password, "Mot de passe", Icons.lock, obscure: true),
       ],
     );
   }

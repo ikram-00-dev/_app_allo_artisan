@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../services/api_service.dart';
+import '/services/api_service.dart';
 
 class ScanQRScreen extends StatefulWidget {
   const ScanQRScreen({super.key});

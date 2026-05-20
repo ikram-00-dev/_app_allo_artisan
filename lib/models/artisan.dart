@@ -2,127 +2,143 @@ import 'user.dart';
 
 class Artisan {
   final User user;
-  final String firstName;
-  final String lastName;
+  final String status;
+  final bool isAvailable;
   final String category;
-  final String wilaya;
-  final String baladeya;
-  final String zone;
-  final String photoUrl;
-  final String diplomaUrl;
-  final String officialDocUrl;
   final String activesStatus;
+  final String diploma;
+  final String bio;
+  final String province;
+  final String city;
+  final String district;
+  final double? latitude;
+  final double? longitude;
   final int experience;
   final double? rating;
+  final int? reviewCount;
+  final List<dynamic>? followers;
 
   Artisan({
     required this.user,
-    required this.firstName,
-    required this.lastName,
+    required this.status,
+    required this.isAvailable,
     required this.category,
-    required this.wilaya,
-    required this.baladeya,
-    required this.zone,
-    required this.photoUrl,
-    required this.diplomaUrl,
-    required this.officialDocUrl,
     required this.activesStatus,
+    required this.diploma,
+    required this.bio,
+    required this.province,
+    required this.city,
+    required this.district,
+    this.latitude,
+    this.longitude,
     required this.experience,
     this.rating,
+    this.reviewCount,
+    this.followers,
   });
 
   factory Artisan.fromJson(Map<String, dynamic> json) {
-    // Handle nested user or flat structure
     User userData;
+
     if (json['User'] != null) {
       userData = User.fromJson(json['User']);
     } else {
       userData = User(
-        idUser: json['id'] ?? json['ID'] ?? 0,
-        username: json['username'] ?? '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}',
-        email: json['email'] ?? '',
+        idUser: json['ID'] ?? json['id'] ?? 0,
+        firstName: json['FirstName'] ?? json['firstName'] ?? '',
+        middleName: json['MiddleName'] ?? json['middleName'] ?? '',
+        lastName: json['LastName'] ?? json['lastName'] ?? '',
+        username: json['Username'] ?? json['username'] ?? '',
+        email: json['Email'] ?? json['email'] ?? '',
         password: '',
-        creationDate: DateTime.tryParse(json['creation_date'] ?? '') ?? DateTime.now(),
-        phoneNumber: json['phone_number'] ?? '',
-        avatarUrl: json['avatar_url'] ?? json['photo_url'] ?? '',
+        creationDate: DateTime.tryParse(json['CreationDate'] ?? json['creationDate'] ?? '') ?? DateTime.now(),
+        phoneNumber: json['PhoneNumber'] ?? json['phoneNumber'] ?? '',
+        avatarUrl: json['AvatarURL'] ?? json['avatarUrl'] ?? '',
+        role: json['Role'] ?? json['role'],
       );
     }
 
     return Artisan(
       user: userData,
-      firstName: json['first_name'] ?? '',
-      lastName: json['last_name'] ?? '',
-      category: json['category'] ?? '',
-      wilaya: json['wilaya'] ?? '',
-      baladeya: json['baladeya'] ?? '',
-      zone: json['zone'] ?? '',
-      photoUrl: json['photo_url'] ?? '',
-      diplomaUrl: json['diploma_url'] ?? '',
-      officialDocUrl: json['official_doc_url'] ?? '',
-      activesStatus: json['actives_status'] ?? 'active',
-      experience: json['experience'] ?? 0,
-      rating: json['rating']?.toDouble(),
+      status: json['Status'] ?? json['status'] ?? 'pending',
+      isAvailable: json['IsAvailable'] ?? json['isAvailable'] ?? false,
+      category: json['Category'] ?? json['category'] ?? '',
+      activesStatus: json['ActivesStatus'] ?? json['activesStatus'] ?? 'inactive',
+      diploma: json['Diploma'] ?? json['diploma'] ?? '',
+      bio: json['Bio'] ?? json['bio'] ?? '',
+      province: json['Province'] ?? json['province'] ?? '',
+      city: json['City'] ?? json['city'] ?? '',
+      district: json['District'] ?? json['district'] ?? '',
+      latitude: json['Latitude'] ?? json['latitude'],
+      longitude: json['Longitude'] ?? json['longitude'],
+      experience: json['Experience'] ?? json['experience'] ?? 0,
+      rating: (json['Rating'] ?? json['rating'])?.toDouble(),
+      reviewCount: json['reviewCount'] ?? 0,
+      followers: json['Followers'] ?? json['followers'],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'first_name': firstName,
-      'last_name': lastName,
+      'firstName': user.firstName,
+      'lastName': user.lastName,
       'category': category,
-      'wilaya': wilaya,
-      'baladeya': baladeya,
-      'zone': zone,
-      'photo_url': photoUrl,
-      'diploma_url': diplomaUrl,
-      'official_doc_url': officialDocUrl,
-      'actives_status': activesStatus,
+      'province': province,
+      'city': city,
+      'district': district,
+      'avatarUrl': user.avatarUrl,
+      'diploma': diploma,
+      'activesStatus': activesStatus,
       'experience': experience,
     };
   }
 
   // Helper getters for UI compatibility
-  String get fullName => '$firstName $lastName';
-  String get fullAddress => '$wilaya, $baladeya, $zone';
-  String get location => fullAddress;  // For backward compatibility
-  String get bio => '';  // Backend doesn't have bio - use empty or from somewhere else
-  String get diploma => diplomaUrl;  // For backward compatibility
+  String get fullName => '${user.firstName} ${user.lastName}'.trim();
+  String get fullAddress => '$province, $city, $district';
+  String get location => fullAddress;
   String get phone => user.phoneNumber;
   String get email => user.email;
   int get id => user.idUser;
-  bool get isActive => activesStatus == 'active';
-  String get avatarUrl => photoUrl.isNotEmpty ? photoUrl : user.avatarUrl;
+  bool get isActive => activesStatus == 'active' || isAvailable;
+  String get avatarUrl => user.avatarUrl.isNotEmpty ? user.avatarUrl : "https://i.pravatar.cc/300";
 
   // CopyWith method
   Artisan copyWith({
     User? user,
-    String? firstName,
-    String? lastName,
+    String? status,
+    bool? isAvailable,
     String? category,
-    String? wilaya,
-    String? baladeya,
-    String? zone,
-    String? photoUrl,
-    String? diplomaUrl,
-    String? officialDocUrl,
     String? activesStatus,
+    String? diploma,
+    String? bio,
+    String? province,
+    String? city,
+    String? district,
+    double? latitude,
+    double? longitude,
     int? experience,
     double? rating,
+    int? reviewCount,
+    List<dynamic>? followers,
   }) {
     return Artisan(
       user: user ?? this.user,
-      firstName: firstName ?? this.firstName,
-      lastName: lastName ?? this.lastName,
+      status: status ?? this.status,
+      isAvailable: isAvailable ?? this.isAvailable,
       category: category ?? this.category,
-      wilaya: wilaya ?? this.wilaya,
-      baladeya: baladeya ?? this.baladeya,
-      zone: zone ?? this.zone,
-      photoUrl: photoUrl ?? this.photoUrl,
-      diplomaUrl: diplomaUrl ?? this.diplomaUrl,
-      officialDocUrl: officialDocUrl ?? this.officialDocUrl,
       activesStatus: activesStatus ?? this.activesStatus,
+      diploma: diploma ?? this.diploma,
+      bio: bio ?? this.bio,
+      province: province ?? this.province,
+      city: city ?? this.city,
+      district: district ?? this.district,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       experience: experience ?? this.experience,
       rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      followers: followers ?? this.followers,
     );
   }
 }

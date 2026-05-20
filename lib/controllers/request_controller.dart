@@ -6,8 +6,9 @@ class RequestController extends GetxController {
   // STATE
   // ============================================================
   var isLoading = false.obs;
-  var simpleRequests = <Map<String, dynamic>>[].obs;
+  var requests = <Map<String, dynamic>>[].obs;
   var urgentRequests = <Map<String, dynamic>>[].obs;
+  var simpleRequests = <Map<String, dynamic>>[].obs;
 
   // ============================================================
   // INIT
@@ -22,53 +23,61 @@ class RequestController extends GetxController {
   // LOAD REQUESTS
   // ============================================================
   Future<void> loadAllRequests() async {
-    await Future.wait([
-      loadSimpleRequests(),
-      loadUrgentRequests(),
-    ]);
+    await loadRequests();
   }
 
-  Future<void> loadSimpleRequests() async {
+  Future<void> loadRequests() async {
     try {
-      final response = await ApiService.getSimpleRequests();
-      simpleRequests.value = List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      print('Error loading simple requests: $e');
-    }
-  }
+      isLoading.value = true;
+      final response = await ApiService.getRequests();
 
-  Future<void> loadUrgentRequests() async {
-    try {
-      final response = await ApiService.getUrgentRequests();
-      urgentRequests.value = List<Map<String, dynamic>>.from(response);
+      // Split requests by type
+      final allRequests = List<Map<String, dynamic>>.from(response);
+      requests.value = allRequests;
+
+      // Separate simple and urgent requests
+      simpleRequests.value = allRequests
+          .where((req) => req['type'] == 'simple')
+          .toList();
+
+      urgentRequests.value = allRequests
+          .where((req) => req['type'] == 'urgent')
+          .toList();
+
     } catch (e) {
-      print('Error loading urgent requests: $e');
+      print('Error loading requests: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
 
   // ============================================================
-  // CREATE REQUESTS
+  // CREATE SIMPLE REQUEST
   // ============================================================
   Future<bool> createSimpleRequest({
     required String description,
-    required int contactId,
-    required int messageId,
+    required String category,
+    required double latitude,
+    required double longitude,
+    int? clientId,
   }) async {
     try {
       isLoading.value = true;
 
       final data = {
         'description': description,
-        'request_date': DateTime.now().toIso8601String(),
+        'type': 'simple',
+        'category': category,
+        'latitude': latitude,
+        'longitude': longitude,
         'status': 'pending',
-        'message_id': messageId,
-        'contact_id': contactId,
+        if (clientId != null) 'clientId': clientId,
       };
 
-      await ApiService.createSimpleRequest(data);
-      await loadSimpleRequests();
+      await ApiService.createRequest(data);
+      await loadRequests();
 
-      Get.snackbar("Succès", "Demande simple créée");
+      Get.snackbar("Succès", "Demande créée avec succès");
       return true;
     } catch (e) {
       Get.snackbar("Erreur", "Impossible de créer la demande");
@@ -78,28 +87,35 @@ class RequestController extends GetxController {
     }
   }
 
+  // ============================================================
+  // CREATE URGENT REQUEST
+  // ============================================================
   Future<bool> createUrgentRequest({
     required String description,
-    required DateTime deadline,
-    required String priorityLevel, // 'Low', 'Medium', 'High'
-    required int clientId,
+    required String category,
+    required double latitude,
+    required double longitude,
+    required String priorityLevel, // 'low', 'medium', 'high'
+    int? clientId,
   }) async {
     try {
       isLoading.value = true;
 
       final data = {
         'description': description,
-        'request_date': DateTime.now().toIso8601String(),
+        'type': 'urgent',
+        'category': category,
+        'latitude': latitude,
+        'longitude': longitude,
+        'priorityLevel': priorityLevel.toLowerCase(),
         'status': 'pending',
-        'deadline': deadline.toIso8601String(),
-        'priority_level': priorityLevel,
-        'client_id': clientId,
+        if (clientId != null) 'clientId': clientId,
       };
 
-      await ApiService.createUrgentRequest(data);
-      await loadUrgentRequests();
+      await ApiService.createRequest(data);
+      await loadRequests();
 
-      Get.snackbar("Succès", "Demande urgente créée");
+      Get.snackbar("Succès", "Demande urgente créée avec succès");
       return true;
     } catch (e) {
       Get.snackbar("Erreur", "Impossible de créer la demande urgente");
@@ -110,23 +126,51 @@ class RequestController extends GetxController {
   }
 
   // ============================================================
-  // DELETE
+  // DELETE REQUEST
   // ============================================================
-  Future<void> deleteSimpleRequest(int id) async {
+  Future<void> deleteRequest(int id) async {
     try {
-      await ApiService.delete('/simple_requests/$id');
-      simpleRequests.removeWhere((req) => req['id_request'] == id);
+      await ApiService.delete('/requests/$id');
+      requests.removeWhere((req) => req['idRequest'] == id || req['IDRequest'] == id);
+      simpleRequests.removeWhere((req) => req['idRequest'] == id || req['IDRequest'] == id);
+      urgentRequests.removeWhere((req) => req['idRequest'] == id || req['IDRequest'] == id);
+
+      Get.snackbar("Succès", "Demande supprimée");
     } catch (e) {
       print('Error deleting request: $e');
+      Get.snackbar("Erreur", "Impossible de supprimer la demande");
     }
   }
 
-  Future<void> deleteUrgentRequest(int id) async {
+  // ============================================================
+  // UPDATE REQUEST STATUS
+  // ============================================================
+  Future<void> updateRequestStatus(int id, String status) async {
     try {
-      await ApiService.delete('/urgent_requests/$id');
-      urgentRequests.removeWhere((req) => req['id_request'] == id);
+      await ApiService.put('/requests/$id', {'status': status});
+      await loadRequests();
+
+      Get.snackbar("Succès", "Statut mis à jour");
     } catch (e) {
-      print('Error deleting urgent request: $e');
+      print('Error updating request status: $e');
+      Get.snackbar("Erreur", "Impossible de mettre à jour le statut");
     }
+  }
+
+  // ============================================================
+  // HELPER METHODS
+  // ============================================================
+  List<Map<String, dynamic>> getRequestsByCategory(String category) {
+    return requests.where((req) => req['category'] == category).toList();
+  }
+
+  List<Map<String, dynamic>> getPendingRequests() {
+    return requests.where((req) => req['status'] == 'pending').toList();
+  }
+
+  List<Map<String, dynamic>> getHighPriorityUrgentRequests() {
+    return urgentRequests.where((req) =>
+    req['priorityLevel'] == 'high' || req['priorityLevel'] == 'High'
+    ).toList();
   }
 }

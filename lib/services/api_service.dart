@@ -5,9 +5,9 @@ import 'storage_service.dart';
 
 class ApiService {
   // ============================================================
-  // BASE URL - Matches your Go backend on port 8081
+  // BASE URL - Matches your Go backend
   // ============================================================
-  static const String baseUrl = 'http://192.168.1.40:8081/api/v1';
+  static const String baseUrl = 'http://192.168.1.39:8081/api/v1';
   // For Android emulator: 'http://10.0.2.2:8081/api/v1'
   // For iOS simulator: 'http://localhost:8081/api/v1'
 
@@ -147,7 +147,7 @@ class ApiService {
   }
 
   // ============================================================
-  // RESPONSE HANDLER - Matches your Go backend (raw response)
+  // RESPONSE HANDLER
   // ============================================================
 
   static dynamic _handleResponse(http.Response response) {
@@ -181,14 +181,12 @@ class ApiService {
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
-    required String role, // 'clients', 'artisans', 'administrators'
   }) async {
-    final response = await post('/auth/login/$role', {
+    final response = await post('/auth/login', {
       'email': email,
       'password': password,
     });
 
-    // Save token automatically
     if (response['token'] != null) {
       setToken(response['token']);
     }
@@ -197,51 +195,59 @@ class ApiService {
   }
 
   static Future<void> registerClient({
+    required String firstName,
+    String? middleName,
+    required String lastName,
     required String username,
     required String email,
     required String password,
     String? phoneNumber,
+    String? avatarUrl,
   }) async {
-    await post('/auth/register/clients', {
+    await post('/auth/register/client', {
+      'firstName': firstName,
+      'middleName': middleName ?? '',
+      'lastName': lastName,
       'username': username,
       'email': email,
       'password': password,
-      'phone_number': phoneNumber ?? '',
+      'phoneNumber': phoneNumber ?? '',
+      'avatarUrl': avatarUrl ?? '',
     });
   }
 
   static Future<void> registerArtisan({
     required String firstName,
+    String? middleName,
     required String lastName,
+    required String username,
     required String email,
     required String password,
-    required String phone,
+    required String phoneNumber,
     required String category,
-    required String wilaya,
-    required String baladeya,
-    required String zone,
-    String? photoUrl,
-    String? diplomaUrl,
-    String? officialDocUrl,
+    required String province,
+    required String city,
+    required String district,
+    String? avatarUrl,
+    String? diploma,
+    int? experience,
   }) async {
-    await post('/auth/register/artisans', {
-      'first_name': firstName,
-      'last_name': lastName,
+    await post('/auth/register/artisan', {
+      'firstName': firstName,
+      'middleName': middleName ?? '',
+      'lastName': lastName,
+      'username': username,
       'email': email,
       'password': password,
-      'phone_number': phone,
+      'phoneNumber': phoneNumber,
+      'avatarUrl': avatarUrl ?? '',
       'category': category,
-      'wilaya': wilaya,
-      'baladeya': baladeya,
-      'zone': zone,
-      'photo_url': photoUrl ?? '',
-      'diploma_url': diplomaUrl ?? '',
-      'official_doc_url': officialDocUrl ?? '',
+      'diploma': diploma ?? '',
+      'province': province,
+      'city': city,
+      'district': district,
+      'experience': experience ?? 0,
     });
-  }
-
-  static Future<Map<String, dynamic>> refreshToken() async {
-    return await get('/auth/refresh');
   }
 
   static Future<Map<String, dynamic>> getCurrentUser() async {
@@ -254,14 +260,14 @@ class ApiService {
 
   static Future<List<dynamic>> getArtisans({
     String? category,
-    String? wilaya,
-    double? minRating,
+    String? province,
+    double? rating,
     String? search,
   }) async {
     final params = <String, dynamic>{};
     if (category != null) params['category'] = category;
-    if (wilaya != null) params['wilaya'] = wilaya;
-    if (minRating != null) params['rating'] = minRating;
+    if (province != null) params['province'] = province;
+    if (rating != null) params['rating'] = rating;
     if (search != null) params['search'] = search;
 
     return await get('/artisans', queryParams: params);
@@ -339,52 +345,40 @@ class ApiService {
     return await post('/messages', data);
   }
 
-  static Future<Map<String, dynamic>> updateMessage(int messageId, int contactId, Map<String, dynamic> data) async {
-    return await put('/messages/$messageId/$contactId', data);
+  static Future<Map<String, dynamic>> updateMessage(int messageId, Map<String, dynamic> data) async {
+    return await put('/messages/$messageId', data);
   }
 
-  static Future<void> deleteMessage(int messageId, int contactId) async {
-    await delete('/messages/$messageId/$contactId');
+  static Future<void> deleteMessage(int messageId) async {
+    await delete('/messages/$messageId');
   }
 
   // ============================================================
   // REQUEST ENDPOINTS
   // ============================================================
 
-  static Future<List<dynamic>> getSimpleRequests() async {
-    return await get('/simple_requests');
+  static Future<List<dynamic>> getRequests() async {
+    return await get('/requests');
   }
 
-  static Future<Map<String, dynamic>> createSimpleRequest(Map<String, dynamic> data) async {
-    return await post('/simple_requests', data);
-  }
-
-  static Future<List<dynamic>> getUrgentRequests() async {
-    return await get('/urgent_requests');
-  }
-
-  static Future<Map<String, dynamic>> createUrgentRequest(Map<String, dynamic> data) async {
-    return await post('/urgent_requests', data);
+  static Future<Map<String, dynamic>> createRequest(Map<String, dynamic> data) async {
+    return await post('/requests', data);
   }
 
   // ============================================================
   // APPOINTMENT ENDPOINTS
   // ============================================================
 
-  static Future<List<dynamic>> getSimpleAppointments() async {
-    return await get('/appointments_simple');
+  static Future<List<dynamic>> getAppointments() async {
+    return await get('/appointments');
   }
 
-  static Future<Map<String, dynamic>> createSimpleAppointment(Map<String, dynamic> data) async {
-    return await post('/appointments_simple', data);
+  static Future<Map<String, dynamic>> createAppointment(Map<String, dynamic> data) async {
+    return await post('/appointments', data);
   }
 
-  static Future<List<dynamic>> getUrgentAppointments() async {
-    return await get('/appointments_urgent');
-  }
-
-  static Future<Map<String, dynamic>> createUrgentAppointment(Map<String, dynamic> data) async {
-    return await post('/appointments_urgent', data);
+  static Future<Map<String, dynamic>> updateAppointmentStatus(int id, String status) async {
+    return await put('/appointments/$id', {'status': status});
   }
 
   // ============================================================
@@ -407,21 +401,12 @@ class ApiService {
   // NOTIFICATION ENDPOINTS
   // ============================================================
 
-  static Future<List<dynamic>> getClientNotifications() async {
-    return await get('/notifications_clients');
+  static Future<List<dynamic>> getNotifications() async {
+    return await get('/notifications');
   }
 
-  static Future<List<dynamic>> getArtisanNotifications() async {
-    return await get('/notifications_artisans');
-  }
-
-  static Future<List<dynamic>> getAdminNotifications() async {
-    return await get('/notifications_admins');
-  }
-
-  static Future<void> markNotificationAsRead(String type, int id) async {
-    final endpoint = '/notifications_${type}s/$id';
-    await put(endpoint, {'is_read': true});
+  static Future<void> markNotificationAsRead(int id) async {
+    await put('/notifications/$id', {'isRead': true});
   }
 
   // ============================================================
@@ -430,13 +415,5 @@ class ApiService {
 
   static Future<Map<String, dynamic>> createReport(Map<String, dynamic> data) async {
     return await post('/reports', data);
-  }
-
-  static Future<Map<String, dynamic>> createReportArtisan(Map<String, dynamic> data) async {
-    return await post('/report_artisans', data);
-  }
-
-  static Future<Map<String, dynamic>> createReportPost(Map<String, dynamic> data) async {
-    return await post('/report_posts', data);
   }
 }

@@ -4,9 +4,7 @@ import 'package:get/get.dart';
 
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
-
-import '../screens/home_screen.dart';
-import '../screens/login_screen.dart';
+import '../routes/app_routes.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -49,30 +47,41 @@ class _SplashScreenState extends State<SplashScreen>
         return;
       }
 
-      // ✅ CALL BACKEND
+      // ✅ CALL BACKEND to get current user
       final user = await ApiService.get("/auth/me");
 
-      // optional: store user locally
+      // Store user locally and get role
       await StorageService.saveUser(user);
+
+      // Extract role from user object
+      final role = user['Role'] ?? user['role'] ?? '';
+      await StorageService.saveRole(role.toString().toLowerCase());
 
       if (!mounted) return;
 
-      _goToHome();
+      // Navigate based on user role (client or artisan only)
+      _goToHomeByRole(role.toString().toLowerCase());
 
     } catch (e) {
       // ❌ token invalid or backend error
-      await StorageService.clear();
+      await StorageService.clearToken();
 
+      if (!mounted) return;
       _goToLogin();
     }
   }
 
-  void _goToHome() {
-    Get.offAll(() => const HomeScreen());
+  void _goToHomeByRole(String role) {
+    if (role == 'artisan') {
+      Get.offAllNamed(AppRoutes.artisanHome);
+    } else {
+      // Default to client home for client, or any other role
+      Get.offAllNamed(AppRoutes.clientHome);
+    }
   }
 
   void _goToLogin() {
-    Get.offAll(() => const LoginScreen());
+    Get.offAllNamed(AppRoutes.login);
   }
 
   @override

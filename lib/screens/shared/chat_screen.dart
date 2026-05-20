@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../controllers/message_controller.dart';
-import '../models/message.dart';
+import '../../controllers/message_controller.dart';
+import '../../models/message.dart';
+import '../../services/storage_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final int contactId;
@@ -24,12 +25,26 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController textController = TextEditingController();
   final ScrollController scrollController = ScrollController();
 
-  bool isArtisan = true; // change based on your auth
+  bool isArtisan = false;
+  int currentUserId = 0;
 
   @override
   void initState() {
     super.initState();
-    controller.fetchMessages();
+    _loadUserRole();
+    controller.fetchMessages(widget.contactId);
+  }
+
+  Future<void> _loadUserRole() async {
+    final role = await StorageService.getRole();
+    setState(() {
+      isArtisan = role == 'artisan';
+    });
+
+    final user = await StorageService.getUser();
+    if (user != null) {
+      currentUserId = user['ID'] ?? user['id'] ?? 0;
+    }
   }
 
   void scrollToBottom() {
@@ -47,16 +62,11 @@ class _ChatScreenState extends State<ChatScreen> {
   void sendMessage() async {
     if (textController.text.trim().isEmpty) return;
 
-    final msg = Message(
-      idMessage: 0,
+    await controller.sendMessage(
       text: textController.text.trim(),
-      timestamp: DateTime.now(),
-      isSentToClient: isArtisan, // logic based on role
-      seen: false,
       contactId: widget.contactId,
+      isSentByArtisan: isArtisan,
     );
-
-    await controller.sendMessage(message: msg);
 
     textController.clear();
     scrollToBottom();
@@ -91,9 +101,16 @@ class _ChatScreenState extends State<ChatScreen> {
           /// ================= MESSAGES =================
           Expanded(
             child: Obx(() {
+              // Filter messages for this contact
               final messages = controller.messages
                   .where((m) => m.contactId == widget.contactId)
                   .toList();
+
+              if (controller.isLoading.value && messages.isEmpty) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
 
               return ListView.builder(
                 controller: scrollController,
@@ -102,8 +119,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 itemBuilder: (context, index) {
                   final msg = messages[index];
 
-                  final isMe =
-                  msg.isSentByCurrentUser(isArtisan);
+                  final isMe = msg.isSentByCurrentUser(
+                    isArtisan,
+                    currentUserId,
+                  );
 
                   return Align(
                     alignment: isMe
@@ -135,12 +154,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                       ),
-
                       child: Column(
                         crossAxisAlignment:
                         CrossAxisAlignment.end,
                         children: [
-
                           /// TEXT
                           Text(
                             msg.text,
@@ -148,7 +165,6 @@ class _ChatScreenState extends State<ChatScreen> {
                               fontSize: 14,
                             ),
                           ),
-
                           const SizedBox(height: 4),
 
                           /// TIME + SEEN
@@ -162,9 +178,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   color: Colors.grey[600],
                                 ),
                               ),
-
                               const SizedBox(width: 5),
-
                               if (isMe)
                                 Icon(
                                   msg.seen
@@ -217,7 +231,6 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 6),
 
                 /// SEND BUTTON

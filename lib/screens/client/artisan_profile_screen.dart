@@ -1,4 +1,4 @@
-// lib/screens/artisan/artisan_profile_screen.dart
+// lib/screens/client/artisan_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -157,7 +157,11 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
           ),
           if (showQRCode) ...[
             const SizedBox(height: 20),
-            QrImageView(data: "artisan:${widget.artisanId}", version: QrVersions.auto, size: 200),
+            QrImageView(
+              data: "artisan:${widget.artisanId}",
+              version: QrVersions.auto,
+              size: 200,
+            ),
           ],
         ],
       ),
@@ -206,13 +210,22 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
         children: [
           const Text("About", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 10),
-          Text(artisan.bio, style: const TextStyle(height: 1.5, color: Colors.black87)),
+          Text(artisan.bio.isNotEmpty ? artisan.bio : "No description provided",
+              style: const TextStyle(height: 1.5, color: Colors.black87)),
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: _infoCard("Diploma", artisan.diploma)),
+              Expanded(child: _infoCard("Diploma", artisan.diploma.isNotEmpty ? artisan.diploma : "Not specified")),
               const SizedBox(width: 12),
               Expanded(child: _infoCard("Status", artisan.activesStatus)),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(child: _infoCard("Experience", "${artisan.experience} years")),
+              const SizedBox(width: 12),
+              Expanded(child: _infoCard("Rating", (artisan.rating ?? 0).toStringAsFixed(1))),
             ],
           ),
           const SizedBox(height: 20),
@@ -278,7 +291,8 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                   color: available ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text("${index.toString().padLeft(2, '0')}h", style: TextStyle(color: available ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                child: Text("${index.toString().padLeft(2, '0')}h",
+                    style: TextStyle(color: available ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
               );
             }),
           ),
@@ -303,7 +317,8 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                 if (post.image.isNotEmpty)
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-                    child: Image.network(post.image, width: double.infinity, height: 250, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 250, color: Colors.grey[300])),
+                    child: Image.network(post.image, width: double.infinity, height: 250, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(height: 250, color: Colors.grey[300], child: const Icon(Icons.broken_image, size: 50))),
                   ),
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -312,7 +327,7 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
                     children: [
                       Text(post.content),
                       const SizedBox(height: 12),
-                      Text(post.createdAt.toString().split(' ')[0], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text(_formatDate(post.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -322,6 +337,10 @@ class _ArtisanProfileScreenState extends State<ArtisanProfileScreen> {
         ],
       );
     });
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.day}/${date.month}/${date.year}";
   }
 
   Widget _infoCard(String title, String value) {

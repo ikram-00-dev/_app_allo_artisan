@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/auth_controller.dart';
-import '../../widgets/app_wets.dart';
-import '../../utils/utils.dart';
+import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
+import 'package:allo_artisan_gpt/core/theme/app_colors.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -66,6 +66,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     String category = "";
     String zone = "";
     String description = "";
+    final TextEditingController categoryController = TextEditingController();
+    final TextEditingController zoneController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
 
     Get.bottomSheet(
       Container(
@@ -89,24 +92,45 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 24),
 
-                  CustomTextField(
-                    hint: "Catégorie",
-                    onChanged: (v) => category = v,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  CustomTextField(
-                    hint: "Zone",
-                    onChanged: (v) => zone = v,
-                  ),
-
-                  const SizedBox(height: 16),
-
+                  // Category Field
                   TextField(
+                    controller: categoryController,
+                    onChanged: (v) => category = v,
+                    decoration: InputDecoration(
+                      hintText: "Catégorie",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Zone Field
+                  TextField(
+                    controller: zoneController,
+                    onChanged: (v) => zone = v,
+                    decoration: InputDecoration(
+                      hintText: "Zone",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Description Field
+                  TextField(
+                    controller: descriptionController,
                     maxLines: 5,
                     onChanged: (v) => description = v,
                     decoration: InputDecoration(
@@ -114,31 +138,55 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                     ),
                   ),
-
                   const SizedBox(height: 24),
 
-                  CustomButton(
-                    text: "Envoyer",
-                    onPressed: () {
-                      if (category.isEmpty || description.isEmpty) {
+                  // Submit Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (categoryController.text.isEmpty ||
+                            descriptionController.text.isEmpty) {
+                          Get.snackbar(
+                            "Erreur",
+                            "Veuillez remplir les champs",
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white,
+                          );
+                          return;
+                        }
+
+                        Get.back();
+
                         Get.snackbar(
-                          "Erreur",
-                          "Veuillez remplir les champs",
+                          "Succès",
+                          "Demande envoyée avec succès",
+                          backgroundColor: AppColors.primary,
+                          colorText: Colors.white,
                         );
-                        return;
-                      }
-
-                      Get.back();
-
-                      Get.snackbar(
-                        "Succès",
-                        "Demande envoyée avec succès",
+                      },
+                      style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
-                        colorText: Colors.white,
-                      );
-                    },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        "Envoyer",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -172,9 +220,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 20),
-
             ...publications.map(
                   (post) => Container(
                 margin: const EdgeInsets.only(bottom: 20),
@@ -197,9 +243,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                             backgroundImage:
                             NetworkImage(post["avatar"]),
                           ),
-
                           const SizedBox(width: 12),
-
                           Expanded(
                             child: Column(
                               crossAxisAlignment:
@@ -213,9 +257,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-
                                     const SizedBox(width: 6),
-
                                     if (post["verified"])
                                       const Icon(
                                         Icons.verified,
@@ -224,9 +266,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                                       ),
                                   ],
                                 ),
-
                                 const SizedBox(height: 4),
-
                                 Row(
                                   children: [
                                     Text(
@@ -235,15 +275,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                                         color: Colors.grey.shade600,
                                       ),
                                     ),
-
                                     const SizedBox(width: 8),
-
                                     const Icon(
                                       Icons.star,
                                       size: 16,
                                       color: Colors.amber,
                                     ),
-
                                     Text(
                                       post["rating"].toString(),
                                     ),
@@ -252,7 +289,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                               ],
                             ),
                           ),
-
                           Text(
                             post["time"],
                             style: TextStyle(
@@ -263,7 +299,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         ],
                       ),
                     ),
-
                     ClipRRect(
                       borderRadius: BorderRadius.circular(0),
                       child: Image.network(
@@ -271,9 +306,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         width: double.infinity,
                         height: 250,
                         fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 250,
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.broken_image, size: 50),
+                          );
+                        },
                       ),
                     ),
-
                     Padding(
                       padding: const EdgeInsets.all(14),
                       child: Column(
@@ -281,9 +322,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         CrossAxisAlignment.start,
                         children: [
                           Text(post["description"]),
-
                           const SizedBox(height: 16),
-
                           Row(
                             children: [
                               InkWell(
@@ -305,9 +344,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                                   ],
                                 ),
                               ),
-
                               const SizedBox(width: 24),
-
                               Row(
                                 children: [
                                   const Icon(
@@ -319,9 +356,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                                   ),
                                 ],
                               ),
-
                               const SizedBox(width: 24),
-
                               const Icon(Icons.share_outlined),
                             ],
                           ),

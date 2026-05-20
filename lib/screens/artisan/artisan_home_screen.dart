@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../widgets/app_widgets.dart';
-import '../../utils/utils.dart';
+import 'package:allo_artisan_gpt/core/widgets/app_widgets.dart';
+import '/core/utils.dart';
+import 'package:allo_artisan_gpt/core/theme/app_colors.dart';
+import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
+
 
 class ArtisanHomeScreen extends StatefulWidget {
   const ArtisanHomeScreen({super.key});

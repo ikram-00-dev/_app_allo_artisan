@@ -21,8 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
-  String role = "client";
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,9 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             color: Color(0xFF2563EB),
                           ),
                         ),
-
                         const SizedBox(height: 24),
-
                         const Text(
                           "Welcome to Allo Artisan",
                           textAlign: TextAlign.center,
@@ -88,9 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 1.2,
                           ),
                         ),
-
                         const SizedBox(height: 10),
-
                         Text(
                           "Trouvez l'artisan qu'il vous faut",
                           style: TextStyle(
@@ -100,9 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 40),
-
                     // =========================
                     // CARD
                     // =========================
@@ -123,7 +115,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-
                       child: Form(
                         key: formKey,
                         child: Column(
@@ -137,9 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Color(0xFF111827),
                               ),
                             ),
-
                             const SizedBox(height: 8),
-
                             const Text(
                               "Connectez-vous à votre compte",
                               style: TextStyle(
@@ -147,9 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Color(0xFF6B7280),
                               ),
                             ),
-
                             const SizedBox(height: 28),
-
                             // =========================
                             // EMAIL
                             // =========================
@@ -161,15 +148,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Color(0xFF374151),
                               ),
                             ),
-
                             const SizedBox(height: 10),
-
                             TextFormField(
                               controller: emailController,
                               keyboardType: TextInputType.emailAddress,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return "Enter your email";
+                                  return "Entrez votre email";
                                 }
                                 return null;
                               },
@@ -200,9 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ),
-
                             const SizedBox(height: 22),
-
                             // =========================
                             // PASSWORD
                             // =========================
@@ -214,15 +197,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Color(0xFF374151),
                               ),
                             ),
-
                             const SizedBox(height: 10),
-
                             TextFormField(
                               controller: passwordController,
                               obscureText: true,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return "Enter your password";
+                                  return "Entrez votre mot de passe";
                                 }
                                 return null;
                               },
@@ -253,109 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ),
-
-                            const SizedBox(height: 24),
-
-                            // =========================
-                            // ROLE
-                            // =========================
-                            const Text(
-                              "Type de compte",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                color: Color(0xFF374151),
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        role = "client";
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 15,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: role == "client"
-                                            ? const Color(0xFFEFF6FF)
-                                            : Colors.white,
-                                        borderRadius:
-                                        BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: role == "client"
-                                              ? const Color(0xFF2563EB)
-                                              : const Color(0xFFD1D5DB),
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          "Client",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: role == "client"
-                                                ? const Color(0xFF2563EB)
-                                                : const Color(0xFF374151),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                const SizedBox(width: 14),
-
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        role = "artisan";
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 15,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: role == "artisan"
-                                            ? const Color(0xFFEFF6FF)
-                                            : Colors.white,
-                                        borderRadius:
-                                        BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: role == "artisan"
-                                              ? const Color(0xFF2563EB)
-                                              : const Color(0xFFD1D5DB),
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          "Artisan",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: role == "artisan"
-                                                ? const Color(0xFF2563EB)
-                                                : const Color(0xFF374151),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
                             const SizedBox(height: 28),
-
                             // =========================
                             // LOGIN BUTTON
                             // =========================
@@ -371,22 +250,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                         .validate()) {
                                       return;
                                     }
-
                                     await controller.login(
-                                      email:
-                                      emailController.text.trim(),
-                                      password:
-                                      passwordController.text.trim(),
-                                      userRole: role,
+                                      email: emailController.text.trim(),
+                                      password: passwordController.text.trim(),
                                     );
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                    const Color(0xFF2563EB),
+                                    backgroundColor: const Color(0xFF2563EB),
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                      BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
                                   child: controller.isLoading.value
@@ -409,30 +282,37 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ),
-
-                            const SizedBox(height: 18),
-
+                            const SizedBox(height: 16),
                             // =========================
-                            // VISITOR BUTTON
+                            // VISITOR BUTTON (ADDED)
                             // =========================
                             SizedBox(
                               width: double.infinity,
                               height: 56,
                               child: OutlinedButton(
                                 onPressed: () async {
-                                  await controller.login(
-                                    email: "visitor@app.com",
-                                    password: "visitor",
-                                    userRole: "visitor",
+                                  // Navigate to client home as visitor
+                                  // You can either create a guest session or just navigate
+                                  // without authentication
+                                  Get.offAllNamed(AppRoutes.clientHome);
+
+                                  Get.snackbar(
+                                    "Mode Visiteur",
+                                    "Vous naviguez en tant que visiteur",
+                                    snackPosition: SnackPosition.TOP,
+                                    duration: const Duration(seconds: 3),
+                                    backgroundColor: Colors.grey,
+                                    colorText: Colors.white,
                                   );
                                 },
                                 style: OutlinedButton.styleFrom(
-                                  backgroundColor:
-                                  const Color(0xFFF3F4F6),
-                                  side: BorderSide.none,
+                                  backgroundColor: Colors.white,
+                                  side: const BorderSide(
+                                    color: Color(0xFF2563EB),
+                                    width: 1.5,
+                                  ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                    BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
                                 child: const Text(
@@ -440,14 +320,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF374151),
+                                    color: Color(0xFF2563EB),
                                   ),
                                 ),
                               ),
                             ),
-
                             const SizedBox(height: 28),
-
                             // =========================
                             // FOOTER
                             // =========================
@@ -470,7 +348,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                         color: Color(0xFF6B7280),
                                       ),
                                     ),
-
                                     GestureDetector(
                                       onTap: () {
                                         Get.toNamed(
@@ -485,14 +362,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                       ),
                                     ),
-
                                     const Text(
                                       " ou ",
                                       style: TextStyle(
                                         color: Color(0xFF6B7280),
                                       ),
                                     ),
-
                                     GestureDetector(
                                       onTap: () {
                                         Get.toNamed(

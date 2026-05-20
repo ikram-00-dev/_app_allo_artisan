@@ -2,16 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/api_service.dart';
 import '../models/message.dart';
+import '../services/storage_service.dart';
 
 class MessageController extends GetxController {
   var isLoading = false.obs;
   var messages = <Message>[].obs;
   var selectedMessage = Rxn<Message>();
+  var currentUserId = 0.obs;
 
-  Future<void> fetchMessages() async {
+  @override
+  void onInit() {
+    super.onInit();
+    loadCurrentUserId();
+  }
+
+  Future<void> loadCurrentUserId() async {
+    try {
+      final user = await ApiService.getCurrentUser();
+      currentUserId.value = user['ID'] ?? user['id'] ?? 0;
+    } catch (e) {
+      print('Error loading user id: $e');
+    }
+  }
+
+  Future<void> fetchMessages(int contactId) async {
     try {
       isLoading.value = true;
-      final res = await ApiService.get("/messages");
+      final res = await ApiService.getMessages(contactId);
       messages.value = (res as List).map((e) => Message.fromJson(e)).toList();
     } catch (e) {
       Get.snackbar("Error", "Failed to load messages");
@@ -23,23 +40,19 @@ class MessageController extends GetxController {
   Future<void> sendMessage({
     required String text,
     required int contactId,
-    required bool isSentToClient,
+    required bool isSentByArtisan,
   }) async {
     try {
       final data = {
         'text': text,
-        'timestamp': DateTime.now().toIso8601String(),
-        'is_sent_to_client': isSentToClient,
+        'contactId': contactId,
+        'senderId': currentUserId.value,
         'seen': false,
-        'contact_id': contactId,
       };
 
       final response = await ApiService.sendMessage(data);
       final newMessage = Message.fromJson(response);
       messages.add(newMessage);
-
-      // No auto-scroll - simple and works!
-
     } catch (e) {
       Get.snackbar("Erreur", "Impossible d'envoyer le message");
     }

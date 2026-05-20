@@ -1,4 +1,3 @@
-import 'package:flutter/animation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/api_service.dart';
@@ -36,7 +35,6 @@ class AuthController extends GetxController {
   Future<bool> login({
     required String email,
     required String password,
-    required String userRole,
   }) async {
     try {
       isLoading.value = true;
@@ -44,14 +42,27 @@ class AuthController extends GetxController {
       final response = await ApiService.login(
         email: email,
         password: password,
-        role: userRole,
       );
 
-      token.value = response['token'];
-      role.value = userRole;
-      user.value = response['user'];
+      debugPrint('Login response: $response');
 
-      await StorageService.saveRole(userRole);
+      // Check if response contains token
+      if (response['token'] == null) {
+        throw Exception('Invalid response from server');
+      }
+
+      token.value = response['token'];
+
+      // Extract role from user object
+      final userData = response['user'];
+      if (userData != null) {
+        final userRole = userData['Role'] ?? userData['role'] ?? '';
+        role.value = userRole.toString().toLowerCase();
+        user.value = userData;
+
+        await StorageService.saveRole(role.value);
+        await StorageService.saveUser(userData);
+      }
 
       Get.snackbar(
         "Succès",
@@ -61,16 +72,15 @@ class AuthController extends GetxController {
       );
 
       // Redirect based on role
-      if (userRole == "clients") {
-        Get.offAllNamed("/client-home");
-      } else if (userRole == "artisans") {
+      if (role.value == "artisan") {
         Get.offAllNamed("/artisan-home");
       } else {
-        Get.offAllNamed("/admin-home");
+        Get.offAllNamed("/client-home");
       }
 
       return true;
     } catch (e) {
+      debugPrint('Login error: $e');
       Get.snackbar(
         "Erreur",
         e.toString().replaceFirst('Exception: ', ''),
@@ -88,26 +98,49 @@ class AuthController extends GetxController {
   // REGISTER CLIENT
   // ============================================================
   Future<bool> registerClient({
+    required String firstName,
+    String? middleName,
+    required String lastName,
     required String username,
     required String email,
     required String password,
-    String? phoneNumber,
+    required String phoneNumber,
+    String? avatarUrl,
   }) async {
     try {
       isLoading.value = true;
 
+      debugPrint('Registering client with: first=$firstName, last=$lastName, email=$email');
+
       await ApiService.registerClient(
+        firstName: firstName,
+        middleName: middleName,
+        lastName: lastName,
         username: username,
         email: email,
         password: password,
         phoneNumber: phoneNumber,
+        avatarUrl: avatarUrl,
       );
 
-      Get.snackbar("Succès", "Compte client créé avec succès");
-      Get.back(); // Return to login
+      debugPrint('Registration successful');
+
+      Get.snackbar(
+        "Succès",
+        "Compte client créé avec succès",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
       return true;
     } catch (e) {
-      Get.snackbar("Erreur", e.toString().replaceFirst('Exception: ', ''));
+      debugPrint('Register error: $e');
+      Get.snackbar(
+        "Erreur",
+        e.toString().replaceFirst('Exception: ', ''),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
       return false;
     } finally {
       isLoading.value = false;
@@ -119,37 +152,60 @@ class AuthController extends GetxController {
   // ============================================================
   Future<bool> registerArtisan({
     required String firstName,
+    String? middleName,
     required String lastName,
+    required String username,
     required String email,
     required String password,
-    required String phone,
+    required String phoneNumber,
     required String category,
-    required String wilaya,
-    required String baladeya,
-    required String zone,
-    String? photoUrl,
+    required String province,
+    required String city,
+    required String district,
+    String? avatarUrl,
+    String? diploma,
+    int? experience,
   }) async {
     try {
       isLoading.value = true;
 
+      debugPrint('Registering artisan: $firstName $lastName, email=$email');
+
       await ApiService.registerArtisan(
         firstName: firstName,
+        middleName: middleName,
         lastName: lastName,
+        username: username,
         email: email,
         password: password,
-        phone: phone,
+        phoneNumber: phoneNumber,
         category: category,
-        wilaya: wilaya,
-        baladeya: baladeya,
-        zone: zone,
-        photoUrl: photoUrl,
+        province: province,
+        city: city,
+        district: district,
+        avatarUrl: avatarUrl,
+        diploma: diploma,
+        experience: experience,
       );
 
-      Get.snackbar("Succès", "Compte artisan créé avec succès");
-      Get.back();
+      debugPrint('Artisan registration successful');
+
+      Get.snackbar(
+        "Succès",
+        "Compte artisan créé avec succès",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
       return true;
     } catch (e) {
-      Get.snackbar("Erreur", e.toString().replaceFirst('Exception: ', ''));
+      debugPrint('Register error: $e');
+      Get.snackbar(
+        "Erreur",
+        e.toString().replaceFirst('Exception: ', ''),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
       return false;
     } finally {
       isLoading.value = false;
@@ -162,9 +218,15 @@ class AuthController extends GetxController {
   Future<void> loadCurrentUser() async {
     try {
       final response = await ApiService.getCurrentUser();
+      debugPrint('Current user response: $response');
       user.value = response;
+      if (response['Role'] != null) {
+        role.value = response['Role'].toString().toLowerCase();
+      } else if (response['role'] != null) {
+        role.value = response['role'].toString().toLowerCase();
+      }
     } catch (e) {
-      print('Error loading user: $e');
+      debugPrint('Error loading user: $e');
     }
   }
 
@@ -177,7 +239,7 @@ class AuthController extends GetxController {
     role.value = '';
     user.value = null;
 
-    Get.offAllNamed("/login-role");
+    Get.offAllNamed("/login");
 
     Get.snackbar(
       "Déconnexion",
@@ -189,8 +251,7 @@ class AuthController extends GetxController {
   // ============================================================
   // HELPERS
   // ============================================================
-  bool get isClient => role.value == 'clients';
-  bool get isArtisan => role.value == 'artisans';
-  bool get isAdmin => role.value == 'administrators';
+  bool get isClient => role.value == 'client';
+  bool get isArtisan => role.value == 'artisan';
   bool get isLoggedIn => token.value.isNotEmpty;
 }
