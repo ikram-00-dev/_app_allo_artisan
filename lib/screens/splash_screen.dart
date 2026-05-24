@@ -42,45 +42,55 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       final token = await StorageService.getToken();
 
+      debugPrint('Splash: Token found = ${token != null}');
+
       if (token == null || token.isEmpty) {
+        debugPrint('Splash: No token, going to login');
         _goToLogin();
         return;
       }
 
-      // ✅ CALL BACKEND to get current user
-      final user = await ApiService.get("/auth/me");
+      // Try to verify token by getting current user
+      try {
+        final user = await ApiService.getCurrentUser();
+        debugPrint('Splash: User verified = $user');
 
-      // Store user locally and get role
-      await StorageService.saveUser(user);
+        if (user != null) {
+          // Store user and role
+          await StorageService.saveUser(user);
+          final role = user['Role'] ?? user['role'] ?? '';
+          await StorageService.saveRole(role.toString().toLowerCase());
 
-      // Extract role from user object
-      final role = user['Role'] ?? user['role'] ?? '';
-      await StorageService.saveRole(role.toString().toLowerCase());
-
-      if (!mounted) return;
-
-      // Navigate based on user role (client or artisan only)
-      _goToHomeByRole(role.toString().toLowerCase());
-
+          if (!mounted) return;
+          _goToHomeByRole(role.toString().toLowerCase());
+        } else {
+          // Invalid user data, clear and go to login
+          await StorageService.clearToken();
+          _goToLogin();
+        }
+      } catch (e) {
+        // Token is invalid or expired
+        debugPrint('Splash: Token validation failed: $e');
+        await StorageService.clearToken();
+        _goToLogin();
+      }
     } catch (e) {
-      // ❌ token invalid or backend error
-      await StorageService.clearToken();
-
-      if (!mounted) return;
+      debugPrint('Splash: Error: $e');
       _goToLogin();
     }
   }
 
   void _goToHomeByRole(String role) {
+    debugPrint('Splash: Navigating to home for role: $role');
     if (role == 'artisan') {
       Get.offAllNamed(AppRoutes.artisanHome);
     } else {
-      // Default to client home for client, or any other role
       Get.offAllNamed(AppRoutes.clientHome);
     }
   }
 
   void _goToLogin() {
+    debugPrint('Splash: Navigating to login');
     Get.offAllNamed(AppRoutes.login);
   }
 

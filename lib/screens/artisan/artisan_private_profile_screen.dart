@@ -1,17 +1,31 @@
-// lib/screens/artisan/artisan_dashboard_screen.dart
+// lib/screens/artisan/artisan_private_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/artisan_controller.dart';
+import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
 
-class ArtisanDashboardScreen extends StatelessWidget {
-  ArtisanDashboardScreen({super.key});
+class ArtisanPrivateProfileScreen extends StatelessWidget {
+   ArtisanPrivateProfileScreen({super.key});
 
-  final controller = Get.put(ArtisanController());
+  final ArtisanController controller = Get.put(ArtisanController());
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(
+        title: const Text('Mon Profil'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Get.back();
+          },
+        ),
+      ),
+      bottomNavigationBar: const BottomNavBar(currentIndex: 4),
       body: Obx(() {
         final artisan = controller.artisan.value;
 
@@ -55,9 +69,9 @@ class ArtisanDashboardScreen extends StatelessWidget {
               CircleAvatar(
                 radius: 30,
                 backgroundImage: NetworkImage(
-                    artisan.avatarUrl.isEmpty
-                        ? "https://i.pravatar.cc/150"
-                        : artisan.avatarUrl
+                  artisan.avatarUrl.isEmpty
+                      ? "https://i.pravatar.cc/150"
+                      : artisan.avatarUrl,
                 ),
               ),
               const SizedBox(width: 12),
@@ -130,16 +144,19 @@ class ArtisanDashboardScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Availability",
+            "Disponibilité",
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           Obx(() {
+            if (controller.availability.isEmpty) {
+              return const Center(child: Text("Aucune disponibilité"));
+            }
             return Column(
-              children: List.generate(7, (dayIndex) {
+              children: List.generate(controller.availability.length, (dayIndex) {
                 final day = controller.availability[dayIndex];
                 return ExpansionTile(
-                  title: Text("Day ${day["day"]}"),
+                  title: Text(day["dayName"] ?? "Jour ${day["day"]}"),
                   children: [
                     Wrap(
                       spacing: 6,
@@ -154,7 +171,7 @@ class ArtisanDashboardScreen extends StatelessWidget {
                           ),
                         );
                       }),
-                    )
+                    ),
                   ],
                 );
               }),
@@ -176,15 +193,25 @@ class ArtisanDashboardScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Followers",
+            "Abonnés",
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           Obx(() {
+            if (controller.followers.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(
+                  child: Text("Aucun abonné pour le moment"),
+                ),
+              );
+            }
             return Column(
               children: controller.followers.map((f) {
                 return ListTile(
-                  leading: const CircleAvatar(),
+                  leading: CircleAvatar(
+                    child: Text(f["name"][0].toUpperCase()),
+                  ),
                   title: Text(f["name"]),
                 );
               }).toList(),
@@ -210,7 +237,7 @@ class ArtisanDashboardScreen extends StatelessWidget {
             controller: textController,
             maxLines: 3,
             decoration: const InputDecoration(
-              hintText: "Write something...",
+              hintText: "Partagez votre travail...",
               border: OutlineInputBorder(),
             ),
           ),
@@ -220,7 +247,7 @@ class ArtisanDashboardScreen extends StatelessWidget {
               controller.createPost(textController.text, null);
               textController.clear();
             },
-            child: const Text("Publish"),
+            child: const Text("Publier"),
           ),
         ],
       ),
@@ -237,7 +264,7 @@ class ArtisanDashboardScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           child: const Center(
-            child: Text("No posts yet. Create your first post!"),
+            child: Text("Aucune publication. Créez votre première publication!"),
           ),
         );
       }
@@ -281,16 +308,12 @@ class ArtisanDashboardScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      post.createdAt.toString().split(' ')[0],
+                      _formatDate(post.createdAt),
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () => controller.deletePost(post.idPost),
-                          child: const Text("Delete", style: TextStyle(color: Colors.red)),
-                        ),
-                      ],
+                    TextButton(
+                      onPressed: () => controller.deletePost(post.idPost),
+                      child: const Text("Supprimer", style: TextStyle(color: Colors.red)),
                     ),
                   ],
                 ),
@@ -302,6 +325,10 @@ class ArtisanDashboardScreen extends StatelessWidget {
     });
   }
 
+  String _formatDate(DateTime date) {
+    return "${date.day}/${date.month}/${date.year}";
+  }
+
   Widget _buildQrDialog() {
     return AlertDialog(
       title: const Text("QR Code"),
@@ -309,8 +336,8 @@ class ArtisanDashboardScreen extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Get.back(),
-          child: const Text("Close"),
-        )
+          child: const Text("Fermer"),
+        ),
       ],
     );
   }

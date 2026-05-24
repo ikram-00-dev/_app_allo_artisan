@@ -8,7 +8,7 @@ class RequestController extends GetxController {
   var isLoading = false.obs;
   var requests = <Map<String, dynamic>>[].obs;
   var urgentRequests = <Map<String, dynamic>>[].obs;
-  var simpleRequests = <Map<String, dynamic>>[].obs;
+  var normalRequests = <Map<String, dynamic>>[].obs; // ADD THIS
 
   // ============================================================
   // INIT
@@ -16,16 +16,19 @@ class RequestController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    loadAllRequests();
+    fetchRequests(); // Changed from loadAllRequests to fetchRequests
+  }
+
+  // ============================================================
+  // FETCH REQUESTS (ADD THIS METHOD)
+  // ============================================================
+  Future<void> fetchRequests() async {
+    await loadRequests();
   }
 
   // ============================================================
   // LOAD REQUESTS
   // ============================================================
-  Future<void> loadAllRequests() async {
-    await loadRequests();
-  }
-
   Future<void> loadRequests() async {
     try {
       isLoading.value = true;
@@ -35,9 +38,9 @@ class RequestController extends GetxController {
       final allRequests = List<Map<String, dynamic>>.from(response);
       requests.value = allRequests;
 
-      // Separate simple and urgent requests
-      simpleRequests.value = allRequests
-          .where((req) => req['type'] == 'simple')
+      // Separate normal/simple and urgent requests
+      normalRequests.value = allRequests
+          .where((req) => req['type'] == 'simple' || req['type'] == 'normal')
           .toList();
 
       urgentRequests.value = allRequests
@@ -48,6 +51,38 @@ class RequestController extends GetxController {
       print('Error loading requests: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  // ============================================================
+  // ACCEPT REQUEST
+  // ============================================================
+  Future<bool> acceptRequest(int requestId) async {
+    try {
+      await ApiService.updateRequest(requestId, {'status': 'accepted'});
+      await loadRequests();
+      Get.snackbar("Succès", "Demande acceptée avec succès");
+      return true;
+    } catch (e) {
+      print('Error accepting request: $e');
+      Get.snackbar("Erreur", "Impossible d'accepter la demande");
+      return false;
+    }
+  }
+
+  // ============================================================
+  // DECLINE REQUEST
+  // ============================================================
+  Future<bool> declineRequest(int requestId) async {
+    try {
+      await ApiService.updateRequest(requestId, {'status': 'declined'});
+      await loadRequests();
+      Get.snackbar("Succès", "Demande refusée");
+      return true;
+    } catch (e) {
+      print('Error declining request: $e');
+      Get.snackbar("Erreur", "Impossible de refuser la demande");
+      return false;
     }
   }
 
@@ -130,9 +165,9 @@ class RequestController extends GetxController {
   // ============================================================
   Future<void> deleteRequest(int id) async {
     try {
-      await ApiService.delete('/requests/$id');
+      await ApiService.deleteRequest(id);
       requests.removeWhere((req) => req['idRequest'] == id || req['IDRequest'] == id);
-      simpleRequests.removeWhere((req) => req['idRequest'] == id || req['IDRequest'] == id);
+      normalRequests.removeWhere((req) => req['idRequest'] == id || req['IDRequest'] == id);
       urgentRequests.removeWhere((req) => req['idRequest'] == id || req['IDRequest'] == id);
 
       Get.snackbar("Succès", "Demande supprimée");
@@ -147,7 +182,7 @@ class RequestController extends GetxController {
   // ============================================================
   Future<void> updateRequestStatus(int id, String status) async {
     try {
-      await ApiService.put('/requests/$id', {'status': status});
+      await ApiService.updateRequest(id, {'status': status});
       await loadRequests();
 
       Get.snackbar("Succès", "Statut mis à jour");

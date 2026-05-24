@@ -1,16 +1,19 @@
 import 'package:get/get.dart';
 import '../services/api_service.dart';
 import '../models/appointment.dart';
+import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
 
 class ReservationController extends GetxController {
   var isLoading = false.obs;
   var appointments = <Appointment>[].obs;
-
   @override
   void onInit() {
     fetchAppointments();
     super.onInit();
   }
+  @override
+
+
 
   Future<void> fetchAppointments() async {
     try {

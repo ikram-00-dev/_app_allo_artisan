@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import '../../models/client.dart';
 import '../../models/artisan.dart';
 import '../../models/user.dart';
+import '../../routes/app_routes.dart';
+import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
 
 class ClientProfileScreen extends StatefulWidget {
   final Client client;
@@ -97,7 +99,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
@@ -111,21 +112,13 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-
+      bottomNavigationBar: const BottomNavBar(currentIndex: 4),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // =====================================================
-            // PROFILE HEADER
-            // =====================================================
             _buildProfileHeader(client),
-
             const SizedBox(height: 16),
-
-            // =====================================================
-            // FOLLOWING SECTION
-            // =====================================================
             _buildFollowingSection(),
           ],
         ),
@@ -143,13 +136,11 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
       ),
-
       child: Column(
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // PROFILE IMAGE
               CircleAvatar(
                 radius: 40,
                 backgroundColor: Colors.blue.shade100,
@@ -165,15 +156,11 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                 )
                     : null,
               ),
-
               const SizedBox(width: 16),
-
-              // INFO
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // NAME
                     Row(
                       children: [
                         Expanded(
@@ -185,7 +172,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                             ),
                           ),
                         ),
-                        // VERIFIED ICON
                         Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
@@ -201,7 +187,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    // EMAIL
                     Row(
                       children: [
                         Icon(
@@ -223,7 +208,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // PHONE
                     Row(
                       children: [
                         Icon(
@@ -242,7 +226,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // ID
                     Row(
                       children: [
                         Icon(
@@ -265,10 +248,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
               ),
             ],
           ),
-
-          // =====================================================
-          // PRIVATE ACTIONS
-          // =====================================================
           if (widget.isPrivate) ...[
             const SizedBox(height: 20),
             Row(
@@ -276,7 +255,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Get.toNamed('/settings');
+                      Get.toNamed(AppRoutes.settings);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
@@ -325,7 +304,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
   Widget _buildFollowingSection() {
     return Column(
       children: [
-        // HEADER BUTTON
         GestureDetector(
           onTap: () {
             setState(() {
@@ -385,10 +363,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
             ),
           ),
         ),
-
-        // =====================================================
-        // FOLLOWING LIST
-        // =====================================================
         if (showFollowing) ...[
           const SizedBox(height: 12),
           Container(

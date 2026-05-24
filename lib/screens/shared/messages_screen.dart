@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import '../../models/message.dart';
 import '../../services/api_service.dart';
 import '../../services/storage_service.dart';
+import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -180,6 +181,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xffF5F5F5),
+      appBar: AppBar(
+        title: const Text('Messages'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+      ),
+      bottomNavigationBar: const BottomNavBar(currentIndex: 2),
       body: SafeArea(
         child: selectedContact == null
             ? buildContactsView()
@@ -412,7 +420,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
             itemBuilder: (context, index) {
               final message = messages[index];
 
-              // FIXED: Pass both required arguments
               final isMe = message.isSentByCurrentUser(
                 isArtisan,
                 currentUserId,

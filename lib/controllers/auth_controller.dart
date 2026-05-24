@@ -26,22 +26,29 @@ class AuthController extends GetxController {
       token.value = savedToken;
       role.value = savedRole ?? '';
       await loadCurrentUser();
+
+      // Auto-navigate based on saved role
+      _navigateBasedOnRole(role.value);
     }
   }
 
   // ============================================================
-  // LOGIN
+  // LOGIN - FIXED to use selected role
   // ============================================================
   Future<bool> login({
     required String email,
     required String password,
+    required String userRole,
   }) async {
     try {
       isLoading.value = true;
 
+      debugPrint('Login attempt with selected role: $userRole');
+
       final response = await ApiService.login(
         email: email,
         password: password,
+        role: userRole,
       );
 
       debugPrint('Login response: $response');
@@ -53,28 +60,43 @@ class AuthController extends GetxController {
 
       token.value = response['token'];
 
-      // Extract role from user object
+      // CRITICAL: Use the SELECTED role from login screen, NOT from backend
+      // Convert 'clients' -> 'client' and 'artisans' -> 'artisan' for navigation
+      String selectedRoleForNav = '';
+      if (userRole == 'clients') {
+        selectedRoleForNav = 'client';
+      } else if (userRole == 'artisans') {
+        selectedRoleForNav = 'artisan';
+      } else {
+        selectedRoleForNav = userRole.toLowerCase();
+      }
+
+      role.value = selectedRoleForNav;
+      debugPrint('Using selected role: $selectedRoleForNav');
+
+      // Save role to storage immediately
+      await StorageService.saveRole(selectedRoleForNav);
+
+      // Save user data if available
       final userData = response['user'];
       if (userData != null) {
-        final userRole = userData['Role'] ?? userData['role'] ?? '';
-        role.value = userRole.toString().toLowerCase();
         user.value = userData;
-
-        await StorageService.saveRole(role.value);
         await StorageService.saveUser(userData);
       }
 
       Get.snackbar(
         "Succès",
-        "Connexion réussie",
+        "Connexion réussie en tant que $selectedRoleForNav",
         snackPosition: SnackPosition.TOP,
         duration: const Duration(seconds: 2),
       );
 
-      // Redirect based on role
-      if (role.value == "artisan") {
+      // Navigate based on SELECTED role
+      if (selectedRoleForNav == "artisan") {
+        debugPrint('Navigating to Artisan Home (selected role: artisan)');
         Get.offAllNamed("/artisan-home");
       } else {
+        debugPrint('Navigating to Client Home (selected role: client)');
         Get.offAllNamed("/client-home");
       }
 
@@ -94,9 +116,9 @@ class AuthController extends GetxController {
     }
   }
 
-  // ============================================================
-  // REGISTER CLIENT
-  // ============================================================
+
+  // In auth_controller.dart, update registerClient and registerArtisan methods:
+
   Future<bool> registerClient({
     required String firstName,
     String? middleName,
@@ -110,9 +132,9 @@ class AuthController extends GetxController {
     try {
       isLoading.value = true;
 
-      debugPrint('Registering client with: first=$firstName, last=$lastName, email=$email');
+      debugPrint('Registering client with: email=$email');
 
-      await ApiService.registerClient(
+      final response = await ApiService.registerClient(
         firstName: firstName,
         middleName: middleName,
         lastName: lastName,
@@ -123,16 +145,23 @@ class AuthController extends GetxController {
         avatarUrl: avatarUrl,
       );
 
-      debugPrint('Registration successful');
+      debugPrint('Registration response: $response');
 
       Get.snackbar(
         "Succès",
-        "Compte client créé avec succès",
+        "Compte client créé avec succès!",
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
 
-      return true;
+      // AUTO-LOGIN after registration with 'clients' role
+      final loginSuccess = await login(
+        email: email,
+        password: password,
+        userRole: 'clients',  // ← Important: use 'clients' not 'client'
+      );
+
+      return loginSuccess;
     } catch (e) {
       debugPrint('Register error: $e');
       Get.snackbar(
@@ -140,6 +169,7 @@ class AuthController extends GetxController {
         e.toString().replaceFirst('Exception: ', ''),
         backgroundColor: Colors.red,
         colorText: Colors.white,
+        duration: const Duration(seconds: 4),
       );
       return false;
     } finally {
@@ -147,9 +177,6 @@ class AuthController extends GetxController {
     }
   }
 
-  // ============================================================
-  // REGISTER ARTISAN
-  // ============================================================
   Future<bool> registerArtisan({
     required String firstName,
     String? middleName,
@@ -163,15 +190,17 @@ class AuthController extends GetxController {
     required String city,
     required String district,
     String? avatarUrl,
+    String? diplomaUrl,  // ADD THIS
+    String? officialDocUrl, // ADD THIS
     String? diploma,
     int? experience,
   }) async {
     try {
       isLoading.value = true;
 
-      debugPrint('Registering artisan: $firstName $lastName, email=$email');
+      debugPrint('Registering artisan with: email=$email');
 
-      await ApiService.registerArtisan(
+      final response = await ApiService.registerArtisan(
         firstName: firstName,
         middleName: middleName,
         lastName: lastName,
@@ -184,20 +213,28 @@ class AuthController extends GetxController {
         city: city,
         district: district,
         avatarUrl: avatarUrl,
-        diploma: diploma,
+        diplomaUrl: diplomaUrl,  // ADD THIS
+        officialDocUrl: officialDocUrl, // ADD THIS
         experience: experience,
       );
 
-      debugPrint('Artisan registration successful');
+      debugPrint('Registration response: $response');
 
       Get.snackbar(
         "Succès",
-        "Compte artisan créé avec succès",
+        "Compte artisan créé avec succès!",
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
 
-      return true;
+      // AUTO-LOGIN after registration with 'artisans' role
+      final loginSuccess = await login(
+        email: email,
+        password: password,
+        userRole: 'artisans',  // ← Important: use 'artisans' not 'artisan'
+      );
+
+      return loginSuccess;
     } catch (e) {
       debugPrint('Register error: $e');
       Get.snackbar(
@@ -205,25 +242,36 @@ class AuthController extends GetxController {
         e.toString().replaceFirst('Exception: ', ''),
         backgroundColor: Colors.red,
         colorText: Colors.white,
+        duration: const Duration(seconds: 4),
       );
       return false;
     } finally {
       isLoading.value = false;
     }
   }
-
-  // ============================================================
-  // LOAD CURRENT USER
+  // Helper method for navigation based on role
+  void _navigateBasedOnRole(String role) {
+    if (role == "artisan") {
+      Get.offAllNamed("/artisan-home");
+    } else {
+      Get.offAllNamed("/client-home");
+    }
+  }
   // ============================================================
   Future<void> loadCurrentUser() async {
     try {
       final response = await ApiService.getCurrentUser();
       debugPrint('Current user response: $response');
       user.value = response;
-      if (response['Role'] != null) {
-        role.value = response['Role'].toString().toLowerCase();
-      } else if (response['role'] != null) {
-        role.value = response['role'].toString().toLowerCase();
+
+      // Don't override role from backend if we already have it
+      // Only set if not already set
+      if (role.value.isEmpty) {
+        if (response['Role'] != null) {
+          role.value = response['Role'].toString().toLowerCase();
+        } else if (response['role'] != null) {
+          role.value = response['role'].toString().toLowerCase();
+        }
       }
     } catch (e) {
       debugPrint('Error loading user: $e');

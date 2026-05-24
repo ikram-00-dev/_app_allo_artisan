@@ -6,7 +6,7 @@ class AppRoutes {
   static const registerArtisan = "/register-artisan";
   static const clientHome = "/client-home";
   static const artisanHome = "/artisan-home";
-  static const artisanDashboard = "/artisan-dashboard";
+  static const artisanPrivateProfile = "/artisan-private-profile"; // ADD THIS
   static const artisanProfile = "/artisan-profile";
   static const profile = "/profile";
   static const messages = "/messages";

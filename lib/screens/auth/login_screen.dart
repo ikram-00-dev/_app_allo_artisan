@@ -16,377 +16,280 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final AuthController controller = Get.find<AuthController>();
 
-  final TextEditingController emailController = TextEditingController();
+  final TextEditingController identifierController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
+  String selectedRole = "clients"; // Default role
+  bool obscurePassword = true;
+  bool isLoading = false;
+
+  final List<Map<String, dynamic>> roles = [
+    {'value': 'clients', 'label': 'Client', 'icon': Icons.person},
+    {'value': 'artisans', 'label': 'Artisan', 'icon': Icons.handyman},
+  ];
+
+  Future<void> handleLogin() async {
+    if (formKey.currentState!.validate()) {
+      setState(() => isLoading = true);
+
+      try {
+        await controller.login(
+          email: identifierController.text.trim(),
+          password: passwordController.text.trim(),
+          userRole: selectedRole,
+        );
+      } catch (e) {
+        if (mounted) {
+          Get.snackbar(
+            "Erreur",
+            e.toString().replaceFirst('Exception: ', ''),
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => isLoading = false);
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Color(0xFF2563EB),
-              Color(0xFF1E40AF),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 30,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), // Reduced vertical padding
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 448),
+              child: Form(
+                key: formKey,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // =========================
-                    // LOGO + TITLE
-                    // =========================
-                    Column(
-                      children: [
-                        Container(
-                          width: 85,
-                          height: 85,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(50),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.handyman_rounded,
-                            size: 45,
-                            color: Color(0xFF2563EB),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          "Welcome to Allo Artisan",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            height: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          "Trouvez l'artisan qu'il vous faut",
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.85),
-                          ),
-                        ),
-                      ],
+                    // ============================================================
+                    // LOGO IMAGE (INSERTED DIRECTLY)
+                    // ============================================================
+                    Image.asset(
+                      'assets/images/logo.png',
+                      width: 250,
+                      height: 250,
+                      fit: BoxFit.contain,
                     ),
-                    const SizedBox(height: 40),
-                    // =========================
-                    // CARD
-                    // =========================
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(28),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: const Color(0xFFE5E7EB),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 25,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Form(
-                        key: formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Connexion",
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF111827),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "Connectez-vous à votre compte",
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Color(0xFF6B7280),
-                              ),
-                            ),
-                            const SizedBox(height: 28),
-                            // =========================
-                            // EMAIL
-                            // =========================
-                            const Text(
-                              "Email",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                color: Color(0xFF374151),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return "Entrez votre email";
-                                }
-                                return null;
-                              },
-                              decoration: InputDecoration(
-                                hintText: "votre@email.com",
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFD1D5DB),
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFD1D5DB),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2563EB),
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 22),
-                            // =========================
-                            // PASSWORD
-                            // =========================
-                            const Text(
-                              "Mot de passe",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                color: Color(0xFF374151),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: passwordController,
-                              obscureText: true,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return "Entrez votre mot de passe";
-                                }
-                                return null;
-                              },
-                              decoration: InputDecoration(
-                                hintText: "••••••••",
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFD1D5DB),
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFD1D5DB),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2563EB),
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 28),
-                            // =========================
-                            // LOGIN BUTTON
-                            // =========================
-                            Obx(
-                                  () => SizedBox(
-                                width: double.infinity,
-                                height: 56,
-                                child: ElevatedButton(
-                                  onPressed: controller.isLoading.value
-                                      ? null
-                                      : () async {
-                                    if (!formKey.currentState!
-                                        .validate()) {
-                                      return;
-                                    }
-                                    await controller.login(
-                                      email: emailController.text.trim(),
-                                      password: passwordController.text.trim(),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2563EB),
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
-                                  child: controller.isLoading.value
-                                      ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2.5,
-                                    ),
-                                  )
-                                      : const Text(
-                                    "Se connecter",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            // =========================
-                            // VISITOR BUTTON (ADDED)
-                            // =========================
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: OutlinedButton(
-                                onPressed: () async {
-                                  // Navigate to client home as visitor
-                                  // You can either create a guest session or just navigate
-                                  // without authentication
-                                  Get.offAllNamed(AppRoutes.clientHome);
+                    const SizedBox(height: 24),
 
-                                  Get.snackbar(
-                                    "Mode Visiteur",
-                                    "Vous naviguez en tant que visiteur",
-                                    snackPosition: SnackPosition.TOP,
-                                    duration: const Duration(seconds: 3),
-                                    backgroundColor: Colors.grey,
-                                    colorText: Colors.white,
-                                  );
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  side: const BorderSide(
-                                    color: Color(0xFF2563EB),
-                                    width: 1.5,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
+                    // Role Selection (Client & Artisan only - Admin removed)
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: roles.map((role) {
+                          final isSelected = selectedRole == role['value'];
+                          return Expanded(
+                            child: InkWell(
+                              onTap: () => setState(() => selectedRole = role['value']),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: isSelected ? [
+                                    BoxShadow(
+                                      color: Colors.grey.shade300,
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ] : null,
                                 ),
-                                child: const Text(
-                                  "Continuer comme visiteur",
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF2563EB),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 28),
-                            // =========================
-                            // FOOTER
-                            // =========================
-                            Container(
-                              padding: const EdgeInsets.only(top: 22),
-                              decoration: const BoxDecoration(
-                                border: Border(
-                                  top: BorderSide(
-                                    color: Color(0xFFE5E7EB),
-                                  ),
-                                ),
-                              ),
-                              child: Center(
-                                child: Wrap(
-                                  alignment: WrapAlignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Text(
-                                      "Pas encore de compte ? ",
-                                      style: TextStyle(
-                                        color: Color(0xFF6B7280),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Get.toNamed(
-                                          AppRoutes.registerClient,
-                                        );
-                                      },
-                                      child: const Text(
-                                        "Inscription client",
-                                        style: TextStyle(
-                                          color: Color(0xFF2563EB),
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    const Text(
-                                      " ou ",
-                                      style: TextStyle(
-                                        color: Color(0xFF6B7280),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Get.toNamed(
-                                          AppRoutes.registerArtisan,
-                                        );
-                                      },
-                                      child: const Text(
-                                        "Devenir artisan",
-                                        style: TextStyle(
-                                          color: Color(0xFF2563EB),
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
+                                    Icon(role['icon'], size: 18),
+                                    const SizedBox(width: 8),
+                                    Text(role['label']),
                                   ],
                                 ),
                               ),
                             ),
-                          ],
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Email/Username Field (Blue border)
+                    TextFormField(
+                      controller: identifierController,
+                      keyboardType: TextInputType.text,
+                      decoration: InputDecoration(
+                        labelText: 'Email ou nom d\'utilisateur',
+
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez entrer votre email ou nom d\'utilisateur';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Password Field (Blue border)
+                    TextFormField(
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      decoration: InputDecoration(
+                        labelText: 'Mot de passe',
+
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              obscurePassword = !obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez entrer votre mot de passe';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Login Button
+                    ElevatedButton(
+                      onPressed: isLoading ? null : handleLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: isLoading
+                          ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                          : const Text(
+                        'Se connecter',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Visitor Button
+                    OutlinedButton(
+                      onPressed: () async {
+                        Get.offAllNamed(AppRoutes.clientHome);
+                        Get.snackbar(
+                          "Mode Visiteur",
+                          "Vous naviguez en tant que visiteur",
+                          snackPosition: SnackPosition.TOP,
+                          duration: const Duration(seconds: 3),
+                          backgroundColor: Colors.grey,
+                          colorText: Colors.white,
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                      ),
+                      child: const Text(
+                        'Continuer comme visiteur',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+
+                    // Registration Links (Blue color)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Pas de compte ? ',
+                          style: TextStyle(color: Color(0xFF737373)),
+                        ),
+                        GestureDetector(
+                          onTap: () => Get.toNamed(AppRoutes.registerClient),
+                          child: const Text(
+                            'Inscription Client',
+                            style: TextStyle(
+                              color: Color(0xFF2563EB),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: GestureDetector(
+                        onTap: () => Get.toNamed(AppRoutes.registerArtisan),
+                        child: const Text(
+                          'Inscription Artisan',
+                          style: TextStyle(
+                            color: Color(0xFF2563EB),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),

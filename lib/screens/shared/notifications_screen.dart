@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../services/api_service.dart';
 import '../../models/notification.dart';
+import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -70,6 +71,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
         title: const Text("Notifications"),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
         actions: [
           if (notifications.any((n) => !n.isRead))
             TextButton(
@@ -78,6 +82,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
         ],
       ),
+      bottomNavigationBar: const BottomNavBar(currentIndex: 3),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : notifications.isEmpty
