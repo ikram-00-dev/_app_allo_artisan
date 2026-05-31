@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../routes/app_routes.dart';
+import '../client/artisan_profile_screen.dart';
+import 'package:allo_artisan_gpt/screens/client/client_requests_screen.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -22,10 +24,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   final Set<String> likedPosts = {};
 
-  // Static publications data as shown in your image
+  // Updated with artisanId for navigation
   final List<Map<String, dynamic>> publications = [
     {
       "id": "1",
+      "artisanId": 1,                    // ← Added
       "name": "Jawad Ben Yahya",
       "category": "Plomberie",
       "rating": 4.8,
@@ -33,13 +36,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       "time": "Il y a 2 heures",
       "likes": 45,
       "comments": 8,
-      "description":
-      "Installation d'une nouvelle salle de bain complète avec robinetterie moderne et carrelage italien. Projet réalisé en 5 jours.",
-      "image":
-      "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=800",
+      "description": "Installation d'une nouvelle salle de bain complète avec robinetterie moderne et carrelage italien. Projet réalisé en 5 jours.",
+      "image": "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=800",
     },
     {
       "id": "2",
+      "artisanId": 2,                    // ← Added
       "name": "Ahmed Amerani",
       "category": "Électricité",
       "rating": 4.9,
@@ -47,12 +49,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       "time": "Il y a 5 heures",
       "likes": 67,
       "comments": 12,
-      "description":
-      "Rénovation complète de l'installation électrique.",
-      "image":
-      "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800",
+      "description": "Rénovation complète de l'installation électrique.",
+      "image": "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800",
     },
   ];
+  // Navigate to Artisan Profile
+  void _goToArtisanProfile(int artisanId) {
+    if (artisanId > 0) {
+      Get.to(() => ArtisanProfileScreen(artisanId: artisanId));
+    }
+  }
 
   // Helper method to get initials from name
   String _getInitials(String name) {
@@ -129,16 +135,20 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   void onNavBarTapped(int index) {
     switch (index) {
       case 0:
+        break; // Already on home
+
+      case 1: // My Demands
+        Get.toNamed(AppRoutes.clientRequests);
         break;
-      case 1:
-        Get.toNamed(AppRoutes.reservations);
-        break;
+
       case 2:
         Get.toNamed(AppRoutes.messages);
         break;
+
       case 3:
         Get.toNamed(AppRoutes.notifications);
         break;
+
       case 4:
         Get.toNamed(AppRoutes.profile);
         break;
@@ -331,6 +341,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   Widget _buildPostCard(Map<String, dynamic> post) {
     final postId = post['id'];
+    final artisanId = post['artisanId'] ?? 0;
     final isLiked = likedPosts.contains(postId);
     final likeCount = (post['likes'] as int) + (isLiked ? 1 : 0);
     final initials = _getInitials(post['name']);
@@ -346,102 +357,91 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Avatar (Initials), Name, Category, Rating, Time
+          // Clickable Header (Avatar + Name)
           Padding(
             padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                // CircleAvatar with initials instead of image
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: avatarColor,
-                  child: Text(
-                    initials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+            child: GestureDetector(
+              onTap: () => _goToArtisanProfile(artisanId),
+              child: Row(
+                children: [
+                  // Clickable Avatar
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: avatarColor,
+                    child: Text(
+                      initials,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(post['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 6),
-                          if (post['verified'])
-                            const Icon(Icons.verified, color: Colors.blue, size: 18),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(post['category'], style: TextStyle(color: Colors.grey.shade600)),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.star, size: 16, color: Colors.amber),
-                          Text(post['rating'].toString()),
-                        ],
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Clickable Name
+                        Row(
+                          children: [
+                            Text(post['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 6),
+                            if (post['verified'])
+                              const Icon(Icons.verified, color: Colors.blue, size: 18),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(post['category'], style: TextStyle(color: Colors.grey.shade600)),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.star, size: 16, color: Colors.amber),
+                            Text(post['rating'].toString()),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Text(post['time'], style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-              ],
+                  Text(post['time'], style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                ],
+              ),
             ),
           ),
 
-          // Image
+          // Image (not clickable)
           ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(0), bottom: Radius.circular(0)),
             child: Image.network(
               post['image'],
               width: double.infinity,
               height: 250,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  height: 250,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.broken_image, size: 50),
-                );
+                return Container(height: 250, color: Colors.grey[300], child: const Icon(Icons.broken_image, size: 50));
               },
             ),
           ),
 
-          // Description
+          // Description & Actions (same as before)
           Padding(
             padding: const EdgeInsets.all(14),
             child: Text(post['description']),
           ),
 
-          // Action Buttons: Like, Comment, Share
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
               children: [
-                // Like Button
                 GestureDetector(
                   onTap: () => toggleLike(postId),
                   child: Row(
                     children: [
-                      Icon(
-                        isLiked ? Icons.favorite : Icons.favorite_border,
-                        color: isLiked ? Colors.red : Colors.grey,
-                        size: 22,
-                      ),
+                      Icon(isLiked ? Icons.favorite : Icons.favorite_border, color: isLiked ? Colors.red : Colors.grey, size: 22),
                       const SizedBox(width: 6),
                       Text(likeCount.toString(), style: const TextStyle(fontSize: 14)),
                     ],
                   ),
                 ),
                 const SizedBox(width: 24),
-
-                // Comment Button
                 GestureDetector(
-                  onTap: handleRestrictedAction,
+                  onTap: () {},
                   child: Row(
                     children: [
                       const Icon(Icons.mode_comment_outlined, size: 22, color: Colors.grey),
@@ -451,12 +451,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   ),
                 ),
                 const SizedBox(width: 24),
-
-                // Share Button
-                GestureDetector(
-                  onTap: handleRestrictedAction,
-                  child: const Icon(Icons.share_outlined, size: 22, color: Colors.grey),
-                ),
+                const Icon(Icons.share_outlined, size: 22, color: Colors.grey),
               ],
             ),
           ),
@@ -465,17 +460,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       ),
     );
   }
-
   Widget _buildRequestModal() {
-    final List<Map<String, String>> categories = [
-      {'name': 'Plomberie', 'icon': '🔧'},
-      {'name': 'Électricité', 'icon': '⚡'},
-      {'name': 'Menuiserie', 'icon': '🪚'},
-      {'name': 'Peinture', 'icon': '🎨'},
-      {'name': 'Maçonnerie', 'icon': '🧱'},
-      {'name': 'Jardinage', 'icon': '🌿'},
-    ];
-
     return GestureDetector(
       onTap: () => setState(() => _showRequestModal = false),
       child: Container(
@@ -490,144 +475,181 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.add, size: 28),
-                      SizedBox(width: 8),
-                      Text(
-                        'Partager une demande',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Request Type Selection
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTypeButton(
-                          label: 'Normale',
-                          icon: Icons.edit_note_outlined,
-                          isSelected: !isUrgent,
-                          onTap: () => setState(() => isUrgent = false),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildTypeButton(
-                          label: 'Urgente',
-                          icon: Icons.notifications_active,
-                          isSelected: isUrgent,
-                          onTap: () => setState(() => isUrgent = true),
-                          isUrgent: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Info Message
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isUrgent ? Colors.red.shade50 : Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.add, size: 28),
+                        SizedBox(width: 8),
+                        Text('Partager une demande', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      ],
                     ),
-                    child: Row(
+                    const SizedBox(height: 20),
+
+                    // Request Type Selection
+                    Row(
                       children: [
-                        Icon(isUrgent ? Icons.warning_amber_rounded : Icons.info_outline,
-                            color: isUrgent ? Colors.red : Colors.blue, size: 20),
+                        Expanded(
+                          child: _buildTypeButton(
+                            label: 'Normale',
+                            icon: Icons.edit_note_outlined,
+                            isSelected: !isUrgent,
+                            onTap: () => setState(() => isUrgent = false),
+                          ),
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(
-                            isUrgent
-                                ? '⚠️ Les artisans actifs seront notifiés immédiatement'
-                                : 'ℹ️ Votre demande sera visible sur le fil des artisans',
-                            style: TextStyle(fontSize: 12, color: isUrgent ? Colors.red : Colors.blue),
+                          child: _buildTypeButton(
+                            label: 'Urgente',
+                            icon: Icons.notifications_active,
+                            isSelected: isUrgent,
+                            onTap: () => setState(() => isUrgent = true),
+                            isUrgent: true,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // Category Dropdown
-                  DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    decoration: const InputDecoration(
-                      labelText: 'Catégorie *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: categories.map((cat) {
-                      return DropdownMenuItem(
-                        value: cat['name'],
-                        child: Text('${cat['icon']} ${cat['name']}'),
-                      );
-                    }).toList(),
-                    onChanged: (value) => setState(() => _selectedCategory = value!),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Zone Input
-                  TextField(
-                    onChanged: (value) => _requestZone = value,
-                    decoration: const InputDecoration(
-                      labelText: 'Zone',
-                      hintText: 'Ex: Paris 15ème',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Description
-                  TextField(
-                    onChanged: (value) => _requestDescription = value,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Description *',
-                      hintText: 'Décrivez votre besoin...',
-                      border: OutlineInputBorder(),
-                      alignLabelWithHint: true,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => setState(() => _showRequestModal = false),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    // ==================== INFO MESSAGE (KEPT AS REQUESTED) ====================
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isUrgent ? Colors.red.shade50 : Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isUrgent ? Icons.warning_amber_rounded : Icons.info_outline,
+                            color: isUrgent ? Colors.red : Colors.blue,
+                            size: 20,
                           ),
-                          child: const Text('Annuler'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              isUrgent
+                                  ? '⚠️ Les artisans actifs seront notifiés immédiatement'
+                                  : 'ℹ️ Votre demande sera visible sur le fil des artisans',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isUrgent ? Colors.red : Colors.blue,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Category (Obligatory)
+                    DropdownButtonFormField<String>(
+                      value: _selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'Catégorie *',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Plomberie', child: Text('🔧 Plomberie')),
+                        DropdownMenuItem(value: 'Électricité', child: Text('⚡ Électricité')),
+                        DropdownMenuItem(value: 'Menuiserie', child: Text('🪚 Menuiserie')),
+                        DropdownMenuItem(value: 'Peinture', child: Text('🎨 Peinture')),
+                        DropdownMenuItem(value: 'Maçonnerie', child: Text('🧱 Maçonnerie')),
+                        DropdownMenuItem(value: 'Jardinage', child: Text('🌿 Jardinage')),
+                      ],
+                      onChanged: (value) => setState(() => _selectedCategory = value!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Zone (Required only for Urgent)
+                    DropdownButtonFormField<int>(
+                      value: _requestZone.isEmpty ? null : int.tryParse(_requestZone),
+                      decoration: InputDecoration(
+                        labelText: isUrgent ? 'Zone (km) *' : 'Zone (km)',
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: const [5, 10, 20, 30, 35, 40, 45, 50]
+                          .map((km) => DropdownMenuItem(
+                        value: km,
+                        child: Text('$km km'),
+                      ))
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() => _requestZone = value?.toString() ?? '');
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Description (Obligatory)
+                    TextField(
+                      onChanged: (value) => _requestDescription = value,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Description *',
+                        hintText: 'Décrivez votre besoin en détail...',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ==================== IMAGE UPLOAD (LAST POSITION) ====================
+                    GestureDetector(
+                      onTap: () => Get.snackbar("Info", "Fonctionnalité d'upload d'image bientôt disponible"),
+                      child: Container(
+                        height: 130,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300, width: 2),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.grey.shade50,
+                        ),
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_photo_alternate, size: 40, color: Colors.black54),
+                              SizedBox(height: 8),
+                              Text("Ajouter une photo (optionnel)", style: TextStyle(color: Colors.black54)),
+                              Text("JPG, PNG - Max 5MB", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: handleSubmitRequest,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isUrgent ? Colors.red : Colors.blue,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Submit Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => setState(() => _showRequestModal = false),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Annuler'),
                           ),
-                          child: const Text('Envoyer'),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _handleSubmitRequest,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isUrgent ? Colors.red : const Color(0xFF2563EB),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Envoyer la demande', style: TextStyle(color: Colors.white)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -635,8 +657,40 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       ),
     );
   }
+  void _handleSubmitRequest() {
+    // Validation
+    if (_selectedCategory.isEmpty) {
+      Get.snackbar('Erreur', 'Veuillez choisir une catégorie', backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
 
-  Widget _buildTypeButton({
+    if (_requestDescription.trim().isEmpty) {
+      Get.snackbar('Erreur', 'Veuillez entrer une description', backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+
+    if (isUrgent && _requestZone.isEmpty) {
+      Get.snackbar('Erreur', 'La zone est obligatoire pour une demande urgente', backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+
+    // Success
+    Get.snackbar(
+      'Succès',
+      'Demande ${isUrgent ? "urgente" : "normale"} envoyée avec succès!',
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+    );
+
+    // Reset form
+    setState(() {
+      _showRequestModal = false;
+      _requestZone = '';
+      _requestDescription = '';
+      _selectedCategory = 'Plomberie';
+      isUrgent = false;
+    });
+  }  Widget _buildTypeButton({
     required String label,
     required IconData icon,
     required bool isSelected,

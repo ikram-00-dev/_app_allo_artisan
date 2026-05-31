@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
+// Import your new screen
+import 'package:allo_artisan_gpt/screens/client/client_requests_screen.dart'; // ← Adjust path if needed
+
 import '/routes/app_routes.dart';
 import '/controllers/auth_controller.dart';
 
@@ -14,7 +18,6 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AuthController authController = Get.find<AuthController>();
-    final isClient = authController.isClient;
 
     return BottomNavigationBar(
       currentIndex: currentIndex,
@@ -27,29 +30,36 @@ class BottomNavBar extends StatelessWidget {
         if (index == currentIndex) return;
 
         switch (index) {
-          case 0:
-          // Navigate to home based on user role
+          case 0: // Home
             if (authController.isArtisan) {
               Get.offAllNamed(AppRoutes.artisanHome);
             } else {
               Get.offAllNamed(AppRoutes.clientHome);
             }
             break;
-          case 1:
-            Get.toNamed(AppRoutes.reservations);
+
+          case 1: // Reservations (Artisan) / My Demands (Client)
+            if (authController.isArtisan) {
+              Get.toNamed(AppRoutes.reservations);
+            } else {
+              Get.toNamed(AppRoutes.clientRequests); // New client screen
+            }
             break;
-          case 2:
+
+          case 2: // Messages
             Get.toNamed(AppRoutes.messages);
             break;
-          case 3:
+
+          case 3: // Notifications
             Get.toNamed(AppRoutes.notifications);
             break;
-          case 4:
+
+          case 4: // Profile
             Get.toNamed(AppRoutes.profile);
             break;
         }
       },
-      items: const [
+      items: const [  // ← This was missing or broken
         BottomNavigationBarItem(
           icon: Icon(Icons.home_outlined),
           activeIcon: Icon(Icons.home),

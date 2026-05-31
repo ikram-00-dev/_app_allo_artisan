@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
+import 'package:allo_artisan_gpt/core/widgets/client_tile.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/request_controller.dart';
 import '../../routes/app_routes.dart';
@@ -23,24 +23,28 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   // ============================================================
   final List<Map<String, dynamic>> mockNormalDemands = [
     {
+      'idRequest': 1,  // Add this
+      'clientId': 101,  // Add this
+      'clientID': 101,  // Add for compatibility
       'name': 'Aymen Bousahah',
       'time': 'Il y a 2 heures',
       'category': 'Plomberie',
       'location': 'Ghalma 12ème',
-      'description':
-      'Recherche plombier pour rénover une salle de bain complète. Projet prévu dans 2 semaines.',
+      'description': 'Recherche plombier pour rénover une salle de bain complète. Projet prévu dans 2 semaines.',
       'isUrgent': false,
     },
   ];
 
   final List<Map<String, dynamic>> mockUrgentDemands = [
     {
+      'idRequest': 2,  // Add this
+      'clientId': 102,  // Add this
+      'clientID': 102,  // Add for compatibility
       'name': 'Sarah Benamama',
       'time': 'Il y a 10 min',
       'category': 'Plomberie - Fuite d\'eau',
       'location': 'Alger 15ème',
-      'description':
-      "Fuite d'eau importante dans la salle de bain, besoin d'intervention rapide!",
+      'description': "Fuite d'eau importante dans la salle de bain, besoin d'intervention rapide!",
       'isUrgent': true,
     },
   ];
@@ -48,16 +52,20 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   void onNavBarTapped(int index) {
     switch (index) {
       case 0:
-        break;
-      case 1:
+        break; // Already on home
+
+      case 1: // Reservations
         Get.toNamed(AppRoutes.reservations);
         break;
+
       case 2:
         Get.toNamed(AppRoutes.messages);
         break;
+
       case 3:
         Get.toNamed(AppRoutes.notifications);
         break;
+
       case 4:
         Get.toNamed(AppRoutes.profile);
         break;
@@ -295,9 +303,19 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   // ============================================================
   // 🟢 Normal Demand Card
   // ============================================================
+  // ============================================================
+  // 🟢 Normal Demand Card
+  // ============================================================
   Widget _buildNormalDemandCard(Map<String, dynamic> demand, BuildContext context) {
     // Support both real API data and mock data format
     final clientName = demand['client']?['username'] ?? demand['name'] ?? demand['clientName'] ?? 'Client';
+    // In _buildNormalDemandCard and _buildUrgentDemandCard
+    final clientId = demand['clientId'] ??
+        demand['clientID'] ??
+        demand['ClientID'] ??
+        demand['client']?['id'] ??  // If client is an object
+        demand['client']?['idUser'] ??  // Check nested user id
+        demand['userId'];  // Alternative field name
     final category = demand['category'] ?? 'Général';
     final location = demand['location'] ?? demand['zone'] ?? 'Non spécifié';
     final description = demand['description'] ?? '';
@@ -335,67 +353,31 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
               children: [
-                Container(
-                  width: 45,
-                  height: 45,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3B82F6),
-                    borderRadius: BorderRadius.circular(22.5),
-                  ),
-                  child: Center(
+                // Clickable Avatar using ClientTile
+                ClientTile(
+                  clientId: clientId,
+                  name: clientName,
+                  showAsAvatar: true,
+                  avatarRadius: 24,
+                ),
+                const SizedBox(width: 12),
+
+                // Clickable Name using ClientTile
+                Expanded(
+                  child: ClientTile(
+                    clientId: clientId,
+                    name: clientName,
                     child: Text(
-                      clientName.isNotEmpty ? clientName[0].toUpperCase() : 'C',
+                      clientName,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        clientName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.access_time, size: 12, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(
-                            createdAt,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3B82F6).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'Normal',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF3B82F6),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+
                 const Icon(Icons.access_time, color: Color(0xFF3B82F6), size: 20),
               ],
             ),
@@ -464,7 +446,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                       Get.toNamed(
                         AppRoutes.messages,
                         arguments: {
-                          'contactId': demand['clientId'] ?? demand['clientID'],
+                          'contactId': clientId,
                           'contactName': clientName,
                         },
                       );
@@ -516,9 +498,14 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   // ============================================================
   // 🔴 Urgent Demand Card
   // ============================================================
+  // ============================================================
+  // 🔴 Urgent Demand Card
+  // ============================================================
   Widget _buildUrgentDemandCard(Map<String, dynamic> demand, BuildContext context) {
     // Support both real API data and mock data format
     final clientName = demand['client']?['username'] ?? demand['name'] ?? demand['clientName'] ?? 'Client';
+    final clientId = demand['clientId'] ?? demand['clientID'] ?? demand['ClientID'];
+
     final category = demand['category'] ?? 'Général';
     final location = demand['location'] ?? demand['zone'] ?? 'Non spécifié';
     final description = demand['description'] ?? '';
@@ -556,67 +543,31 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
               children: [
-                Container(
-                  width: 45,
-                  height: 45,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444),
-                    borderRadius: BorderRadius.circular(22.5),
-                  ),
-                  child: Center(
+                // Clickable Avatar
+                ClientTile(
+                  clientId: clientId,
+                  name: clientName,
+                  showAsAvatar: true,
+                  avatarRadius: 24,
+                ),
+                const SizedBox(width: 12),
+
+                // Clickable Name
+                Expanded(
+                  child: ClientTile(
+                    clientId: clientId,
+                    name: clientName,
                     child: Text(
-                      clientName.isNotEmpty ? clientName[0].toUpperCase() : 'C',
+                      clientName,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F2937),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        clientName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.access_time, size: 12, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(
-                            createdAt,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'Urgent',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFEF4444),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+
                 const Icon(Icons.timer, color: Color(0xFFEF4444), size: 20),
               ],
             ),

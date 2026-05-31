@@ -10,6 +10,7 @@ import '../../models/message.dart';
 import '../../services/api_service.dart';
 import '../../services/storage_service.dart';
 import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
+import 'package:allo_artisan_gpt/core/widgets/client_tile.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});

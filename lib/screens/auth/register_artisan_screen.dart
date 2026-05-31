@@ -13,7 +13,7 @@ class RegisterArtisanScreen extends StatefulWidget {
 }
 
 class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
-  final auth = Get.find<AuthController>();
+  final authController = Get.find<AuthController>();
 
   RegistrationStep _registrationStep = RegistrationStep.form;
   int _formStep = 1;
@@ -33,12 +33,14 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     'diploma': '',
     'officialDoc': '',
     'profileImage': '',
+    'experience': 0,
   };
 
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   bool _isLoading = false;
 
+  // ==================== Beautiful & Flexible Lists ====================
   final List<String> _wilayas = [
     'Alger', 'Oran', 'Constantine', 'Annaba', 'Blida', 'Batna', 'Djelfa',
     'Sétif', 'Sidi Bel Abbès', 'Biskra', 'Tébessa', 'El Oued', 'Skikda',
@@ -51,24 +53,31 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     'Électronique', 'Informatique', 'Cuisine',
   ];
 
+  // Sample zones (you can make this dynamic later based on city)
+  final List<String> _zones = [
+    'Centre-ville', 'Quartier résidentiel', 'HLM', 'Cité nouvelle',
+    'Zone industrielle', 'Banlieue', 'Vieux quartier', 'Lotissement',
+    'Autre',
+  ];
+
   void _nextStep() {
     if (_formStep == 1) {
-      if (_formData['firstName'].isEmpty ||
-          _formData['lastName'].isEmpty ||
-          _formData['category'].isEmpty ||
-          _formData['province'].isEmpty ||
-          _formData['city'].isEmpty ||
-          _formData['district'].isEmpty) {
-        _showError('Veuillez remplir tous les champs');
+      if (_formData['firstName'].toString().trim().isEmpty ||
+          _formData['lastName'].toString().trim().isEmpty ||
+          _formData['category'].toString().isEmpty ||
+          _formData['province'].toString().isEmpty ||
+          _formData['city'].toString().trim().isEmpty ||
+          _formData['district'].toString().isEmpty) {
+        _showError('Veuillez remplir tous les champs obligatoires');
         return;
       }
     } else if (_formStep == 2) {
       // Documents are optional - no validation
     } else if (_formStep == 3) {
-      if (_formData['email'].isEmpty ||
-          _formData['phoneNumber'].isEmpty ||
-          _formData['password'].isEmpty ||
-          _formData['confirmPassword'].isEmpty) {
+      if (_formData['email'].toString().trim().isEmpty ||
+          _formData['phoneNumber'].toString().trim().isEmpty ||
+          _formData['password'].toString().isEmpty ||
+          _formData['confirmPassword'].toString().isEmpty) {
         _showError('Veuillez remplir tous les champs');
         return;
       }
@@ -79,34 +88,27 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
       _submitRegistration();
       return;
     }
-
     setState(() => _formStep++);
   }
 
   void _previousStep() {
-    if (_formStep > 1) {
-      setState(() => _formStep--);
-    }
+    if (_formStep > 1) setState(() => _formStep--);
   }
 
   void _showError(String message) {
-    Get.snackbar(
-      "Erreur",
-      message,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
+    Get.snackbar("Erreur", message,
+        backgroundColor: Colors.red, colorText: Colors.white);
   }
 
   Future<void> _submitRegistration() async {
     setState(() => _isLoading = true);
 
-    final String finalUsername = '${_formData['firstName'].toLowerCase()}_${_formData['lastName'].toLowerCase()}';
+    final String username = '${_formData['firstName'].toString().toLowerCase()}_${_formData['lastName'].toString().toLowerCase()}';
 
-    final success = await auth.registerArtisan(
+    final success = await authController.registerArtisan(
       firstName: _formData['firstName'],
       lastName: _formData['lastName'],
-      username: finalUsername,
+      username: username,
       email: _formData['email'],
       password: _formData['password'],
       phoneNumber: _formData['phoneNumber'],
@@ -114,10 +116,10 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
       province: _formData['province'],
       city: _formData['city'],
       district: _formData['district'],
+      avatarUrl: _formData['profileImage'].toString().isNotEmpty ? _formData['profileImage'] : null,
       diplomaUrl: _formData['diploma'].toString().isNotEmpty ? _formData['diploma'] : null,
       officialDocUrl: _formData['officialDoc'].toString().isNotEmpty ? _formData['officialDoc'] : null,
-      avatarUrl: _formData['profileImage'].toString().isNotEmpty ? _formData['profileImage'] : null,
-      experience: null,
+      experience: _formData['experience'] ?? 0,
     );
 
     setState(() => _isLoading = false);
@@ -127,169 +129,103 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     }
   }
 
+  // Beautiful Dropdown Style
+  InputDecoration _inputDecoration(String label, {IconData? icon}) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: icon != null ? Icon(icon, color: const Color(0xFF2563EB)) : null,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
   // ============================================================
-  // STEP 1: Informations personnelles + Profile Image
+  // STEP 1 - Updated with beautiful dropdowns
   // ============================================================
   Widget _buildStep1() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Profile Image
         Center(
           child: Column(
             children: [
-              const Text(
-                'Photo de profil *',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
+              const Text('Photo de profil', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 8),
-              const Text(
-                'Ajoutez une photo pour personnaliser votre profil',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
               InkWell(
-                onTap: () {
-                  Get.snackbar('Info', 'Fonctionnalité à venir');
-                },
+                onTap: () => Get.snackbar('Info', 'Fonctionnalité à venir'),
                 child: Container(
-                  width: 120,
-                  height: 120,
+                  width: 120, height: 120,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.grey.shade200,
-                    border: Border.all(color: const Color(0xFF2563EB), width: 2),
+                    border: Border.all(color: const Color(0xFF2563EB), width: 3),
+                    color: Colors.grey.shade100,
                   ),
                   child: _formData['profileImage'].toString().isNotEmpty
-                      ? ClipOval(
-                    child: Image.network(
-                      _formData['profileImage'],
-                      width: 120,
-                      height: 120,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                      : const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.camera_alt, size: 32, color: Color(0xFF2563EB)),
-                      SizedBox(height: 8),
-                      Text(
-                        'Ajouter',
-                        style: TextStyle(color: Color(0xFF2563EB), fontSize: 12),
-                      ),
-                    ],
-                  ),
+                      ? ClipOval(child: Image.network(_formData['profileImage'], fit: BoxFit.cover))
+                      : const Icon(Icons.camera_alt, size: 40, color: Color(0xFF2563EB)),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        const Divider(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 32),
+
         Row(
           children: [
             Expanded(
               child: TextFormField(
-                initialValue: _formData['firstName'],
-                decoration: InputDecoration(
-                  labelText: 'Prénom *',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
+                decoration: _inputDecoration('Prénom *', icon: Icons.person),
                 onChanged: (value) => _formData['firstName'] = value,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: TextFormField(
-                initialValue: _formData['lastName'],
-                decoration: InputDecoration(
-                  labelText: 'Nom *',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
+                decoration: _inputDecoration('Nom *', icon: Icons.person),
                 onChanged: (value) => _formData['lastName'] = value,
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
+
         DropdownButtonFormField<String>(
-          value: _formData['category'].toString().isEmpty ? null : _formData['category'],
-          decoration: InputDecoration(
-            labelText: 'Catégorie *',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          items: _categories.map((cat) {
-            return DropdownMenuItem(value: cat, child: Text(cat));
-          }).toList(),
-          onChanged: (value) {
-            setState(() => _formData['category'] = value ?? '');
-          },
+          value: _formData['category'].isEmpty ? null : _formData['category'],
+          decoration: _inputDecoration('Catégorie *', icon: Icons.category),
+          items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
+          onChanged: (value) => setState(() => _formData['category'] = value ?? ''),
         ),
         const SizedBox(height: 16),
+
+        DropdownButtonFormField<String>(
+          value: _formData['province'].isEmpty ? null : _formData['province'],
+          decoration: _inputDecoration('Wilaya *', icon: Icons.location_city),
+          items: _wilayas.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
+          onChanged: (value) => setState(() => _formData['province'] = value ?? ''),
+        ),
+        const SizedBox(height: 16),
+
         Row(
           children: [
             Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _formData['province'].toString().isEmpty ? null : _formData['province'],
-                decoration: InputDecoration(
-                  labelText: 'Wilaya *',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-                items: _wilayas.map((wilaya) {
-                  return DropdownMenuItem(value: wilaya, child: Text(wilaya));
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => _formData['province'] = value ?? '');
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
               child: TextFormField(
-                initialValue: _formData['city'],
-                decoration: InputDecoration(
-                  labelText: 'Baladeya (Commune) *',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
+                decoration: _inputDecoration('Baladeya (Commune) *', icon: Icons.location_on),
                 onChanged: (value) => _formData['city'] = value,
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        TextFormField(
-          initialValue: _formData['district'],
-          decoration: InputDecoration(
-            labelText: 'Zone *',
-            hintText: 'Ex: Centre-ville, Quartier résidentiel...',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          onChanged: (value) => _formData['district'] = value,
+
+        // Zone as Dropdown (New)
+        DropdownButtonFormField<String>(
+          value: _formData['district'].isEmpty ? null : _formData['district'],
+          decoration: _inputDecoration('Zone / Quartier *', icon: Icons.place),
+          items: _zones.map((zone) => DropdownMenuItem(value: zone, child: Text(zone))).toList(),
+          onChanged: (value) => setState(() => _formData['district'] = value ?? ''),
         ),
       ],
     );
@@ -302,6 +238,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Official Document Upload
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: Colors.blue.shade200, width: 2),
@@ -324,7 +261,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                     Icon(Icons.description, color: Color(0xFF2563EB)),
                     SizedBox(width: 8),
                     Text(
-                      'Document officiel *',
+                      'Document officiel',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -379,6 +316,8 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
           ),
         ),
         const SizedBox(height: 20),
+
+        // Diploma Upload
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: Colors.blue.shade200, width: 2),
@@ -401,7 +340,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                     Icon(Icons.school, color: Color(0xFF2563EB)),
                     SizedBox(width: 8),
                     Text(
-                      'Diplôme / Certification *',
+                      'Diplôme / Certification',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -467,42 +406,22 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextFormField(
-          initialValue: _formData['email'],
+          decoration: _inputDecoration('Email *', icon: Icons.email),
           keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(
-            labelText: 'Email *',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
           onChanged: (value) => _formData['email'] = value,
         ),
         const SizedBox(height: 16),
+
         TextFormField(
-          initialValue: _formData['phoneNumber'],
+          decoration: _inputDecoration('Numéro de téléphone *', icon: Icons.phone),
           keyboardType: TextInputType.phone,
-          decoration: InputDecoration(
-            labelText: 'Numéro de téléphone *',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
           onChanged: (value) => _formData['phoneNumber'] = value,
         ),
         const SizedBox(height: 16),
+
         TextFormField(
           obscureText: !_showPassword,
-          decoration: InputDecoration(
-            labelText: 'Mot de passe *',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-            fillColor: Colors.white,
+          decoration: _inputDecoration('Mot de passe *', icon: Icons.lock).copyWith(
             suffixIcon: IconButton(
               icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
               onPressed: () => setState(() => _showPassword = !_showPassword),
@@ -511,15 +430,10 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
           onChanged: (value) => _formData['password'] = value,
         ),
         const SizedBox(height: 16),
+
         TextFormField(
           obscureText: !_showConfirmPassword,
-          decoration: InputDecoration(
-            labelText: 'Confirmer mot de passe *',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-            fillColor: Colors.white,
+          decoration: _inputDecoration('Confirmer mot de passe *', icon: Icons.lock).copyWith(
             suffixIcon: IconButton(
               icon: Icon(_showConfirmPassword ? Icons.visibility_off : Icons.visibility),
               onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
@@ -660,7 +574,6 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                   // ============================================================
                   Column(
                     children: [
-                      // Row for bubbles and lines
                       Row(
                         children: [
                           // Step 1 bubble

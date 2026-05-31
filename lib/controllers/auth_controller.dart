@@ -33,6 +33,57 @@ class AuthController extends GetxController {
   }
 
   // ============================================================
+  // SWITCH ROLE - ADDED THIS METHOD
+  // ============================================================
+  Future<void> switchRole(String newRole) async {
+    try {
+      // Don't do anything if already in this role
+      if (role.value == newRole) {
+        Get.snackbar(
+          "Information",
+          "Vous êtes déjà en mode ${newRole == 'artisan' ? 'Artisan' : 'Client'}",
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 2),
+        );
+        return;
+      }
+
+      isLoading.value = true;
+
+      // Update the role
+      role.value = newRole;
+
+      // Save to storage
+      await StorageService.saveRole(newRole);
+
+      // Show success message
+      Get.snackbar(
+        "Mode changé",
+        "Vous êtes maintenant en mode ${newRole == 'artisan' ? 'Artisan' : 'Client'}",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+
+      // Navigate based on new role
+      _navigateBasedOnRole(newRole);
+
+    } catch (e) {
+      debugPrint('Error switching role: $e');
+      Get.snackbar(
+        "Erreur",
+        "Impossible de changer de mode",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // ============================================================
   // LOGIN - FIXED to use selected role
   // ============================================================
   Future<bool> login({
@@ -115,7 +166,6 @@ class AuthController extends GetxController {
       isLoading.value = false;
     }
   }
-
 
   // In auth_controller.dart, update registerClient and registerArtisan methods:
 
@@ -249,14 +299,17 @@ class AuthController extends GetxController {
       isLoading.value = false;
     }
   }
+
   // Helper method for navigation based on role
   void _navigateBasedOnRole(String role) {
     if (role == "artisan") {
       Get.offAllNamed("/artisan-home");
-    } else {
+    } else if (role == "client") {
       Get.offAllNamed("/client-home");
     }
+    // Don't navigate if role is empty or unknown
   }
+
   // ============================================================
   Future<void> loadCurrentUser() async {
     try {

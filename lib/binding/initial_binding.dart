@@ -5,7 +5,7 @@ import '../controllers/message_controller.dart';
 import '../controllers/notification_controller.dart';
 import '../controllers/request_controller.dart';
 import '../controllers/reservation_controller.dart';
-import '../controllers/search_controller.dart';
+import '../controllers/artisan_search_controller.dart';
 import '../controllers/settings_controller.dart';
 import '../controllers/user_controller.dart';
 import '../services/api_service.dart';
@@ -41,7 +41,7 @@ class InitialBinding extends Bindings {
     Get.put<ReservationController>(ReservationController(), permanent: true);
 
     // Search Controller (no dependencies)
-    Get.put<SearchController>(SearchController(), permanent: true);
+    Get.put<ArtisanSearchController>(ArtisanSearchController(), permanent: true);
 
     // ============================================================
     // Controllers that REQUIRE ApiService parameter

@@ -20,6 +20,7 @@ import '../models/client.dart';
 import '../models/user.dart';
 import '../services/storage_service.dart';
 import 'app_routes.dart';
+import '../screens/client/client_requests_screen.dart';   // ← ADD THIS LINE
 
 class AppPages {
   // Helper method to get profile screen based on role
@@ -57,6 +58,8 @@ class AppPages {
     GetPage(name: AppRoutes.registerArtisan, page: () => const RegisterArtisanScreen()),
     GetPage(name: AppRoutes.clientHome, page: () => const ClientHomeScreen()),
     GetPage(name: AppRoutes.artisanHome, page: () => const ArtisanHomeScreen()),
+    // NEW CLIENT REQUESTS SCREEN
+    GetPage(name: AppRoutes.clientRequests, page: () => const ClientRequestsScreen(),),
     GetPage(name: AppRoutes.artisanPrivateProfile, page: () =>  ArtisanPrivateProfileScreen()),
     GetPage(name: AppRoutes.artisanProfile, page: () => ArtisanProfileScreen(artisanId: Get.arguments)), // Not const
     GetPage(name: AppRoutes.search, page: () => const SearchScreen()),

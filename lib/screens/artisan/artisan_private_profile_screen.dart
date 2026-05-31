@@ -1,344 +1,473 @@
 // lib/screens/artisan/artisan_private_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../controllers/artisan_controller.dart';
 import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
 
-class ArtisanPrivateProfileScreen extends StatelessWidget {
-   ArtisanPrivateProfileScreen({super.key});
+class ArtisanPrivateProfileScreen extends StatefulWidget {
+  const ArtisanPrivateProfileScreen({super.key});
 
-  final ArtisanController controller = Get.put(ArtisanController());
+  @override
+  State<ArtisanPrivateProfileScreen> createState() => _ArtisanPrivateProfileScreenState();
+}
+
+class _ArtisanPrivateProfileScreenState extends State<ArtisanPrivateProfileScreen> {
+  bool _isVisible = true;
+  bool _showAvailability = false;
+  bool _showFollowers = false;
+
+  // Calendar Data
+  final Map<DateTime, Map<String, dynamic>> _dayStatus = {};
+
+  void _toggleDay(DateTime date) {
+    setState(() {
+      if (!_dayStatus.containsKey(date)) {
+        _dayStatus[date] = {'available': true, 'note': ''};
+      } else {
+        _dayStatus[date]!['available'] = !_dayStatus[date]!['available'];
+      }
+    });
+  }
+
+  void _openNoteDialog(DateTime date) {
+    final TextEditingController noteController = TextEditingController(
+      text: _dayStatus[date]?['note'] ?? '',
+    );
+
+    Get.dialog(
+      AlertDialog(
+        title: Text("Note pour le ${date.day}/${date.month}/${date.year}"),
+        content: TextField(
+          controller: noteController,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText: "Ajouter des détails (ex: rendez-vous, congé, etc.)",
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text("Annuler")),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                if (!_dayStatus.containsKey(date)) {
+                  _dayStatus[date] = {'available': true, 'note': ''};
+                }
+                _dayStatus[date]!['note'] = noteController.text.trim();
+              });
+              Get.back();
+            },
+            child: const Text("Enregistrer"),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Mon Profil'),
+        title: const Text('Allo Artisan'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Get.back();
-          },
-        ),
       ),
       bottomNavigationBar: const BottomNavBar(currentIndex: 4),
-      body: Obx(() {
-        final artisan = controller.artisan.value;
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _buildProfileHeader(),
+            const SizedBox(height: 16),
 
-        if (controller.isLoading.value || artisan == null) {
-          return const Center(child: CircularProgressIndicator());
-        }
+            GestureDetector(
+              onTap: () => setState(() => _showAvailability = !_showAvailability),
+              child: _buildMenuCard(Icons.calendar_today, Colors.green, "Gérer mes disponibilités", "Modifier mon calendrier"),
+            ),
+            if (_showAvailability) _buildCalendar(),
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _buildProfileHeader(),
-              const SizedBox(height: 16),
-              _buildAvailabilityCard(),
-              const SizedBox(height: 16),
-              _buildFollowersCard(),
-              const SizedBox(height: 16),
-              _buildCreatePost(),
-              const SizedBox(height: 16),
-              _buildPostsList(),
-            ],
-          ),
-        );
-      }),
+            const SizedBox(height: 12),
+
+            GestureDetector(
+              onTap: () => setState(() => _showFollowers = !_showFollowers),
+              child: _buildMenuCard(Icons.people, Colors.purple, "Mes abonnés", "2 abonnés"),
+            ),
+            if (_showFollowers) _buildFollowersList(),
+
+            const SizedBox(height: 20),
+
+            _buildCreatePostSection(),
+
+            const SizedBox(height: 24),
+
+            // ==================== MES PUBLICATIONS ====================
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text("Mes publications", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 12),
+            _buildPublicationCard(),
+          ],
+        ),
+      ),
     );
   }
 
+  // ==================== PROFILE HEADER ====================
   Widget _buildProfileHeader() {
-    final artisan = controller.artisan.value!;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
           Row(
             children: [
               CircleAvatar(
-                radius: 30,
-                backgroundImage: NetworkImage(
-                  artisan.avatarUrl.isEmpty
-                      ? "https://i.pravatar.cc/150"
-                      : artisan.avatarUrl,
-                ),
+                radius: 32,
+                backgroundColor: const Color(0xFF2563EB),
+                child: const Text("JY", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      artisan.fullName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      children: [
+                        const Text("Jawad Ben Yahya", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.verified, color: Color(0xFF2563EB), size: 20),
+                      ],
                     ),
-                    Text(
-                      artisan.email,
-                      style: const TextStyle(color: Colors.grey),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
+                          child: const Text("Plomberie", style: TextStyle(color: Color(0xFF2563EB), fontSize: 13)),
+                        ),
+                        const SizedBox(width: 8),
+                        const Row(children: [Icon(Icons.star, color: Colors.amber, size: 18), Text(" 4.8", style: TextStyle(fontWeight: FontWeight.bold))]),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      artisan.category,
-                      style: const TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    const Row(
+                      children: [
+                        Icon(Icons.email, size: 16, color: Colors.grey),
+                        SizedBox(width: 6),
+                        Text("jawadbenyahya@GMAIL.COM", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      ],
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () {
-                  Get.toNamed('/settings');
-                },
-                icon: const Icon(Icons.settings),
-              ),
             ],
           ),
-          const SizedBox(height: 10),
+
+          const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Active status"),
-              Switch(
-                value: artisan.isActive,
-                onChanged: (val) => controller.toggleActive(),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => Get.dialog(_buildQrDialog()),
+                  icon: const Icon(Icons.qr_code, color: Colors.black),
+                  label: const Text("QR Code", style: TextStyle(color: Colors.black)),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), side: const BorderSide(color: Colors.grey)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => Get.toNamed('/settings'),
+                  icon: const Icon(Icons.settings, color: Colors.white),
+                  label: const Text("Paramètres", style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), padding: const EdgeInsets.symmetric(vertical: 12)),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          ElevatedButton.icon(
-            onPressed: () {
-              Get.dialog(_buildQrDialog());
-            },
-            icon: const Icon(Icons.qr_code),
-            label: const Text("Show QR"),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildAvailabilityCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Disponibilité",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          Obx(() {
-            if (controller.availability.isEmpty) {
-              return const Center(child: Text("Aucune disponibilité"));
-            }
-            return Column(
-              children: List.generate(controller.availability.length, (dayIndex) {
-                final day = controller.availability[dayIndex];
-                return ExpansionTile(
-                  title: Text(day["dayName"] ?? "Jour ${day["day"]}"),
+          const SizedBox(height: 16),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 6,
-                      children: List.generate(24, (hour) {
-                        final slot = day["slots"][hour];
-                        final available = slot["available"];
-                        return GestureDetector(
-                          onTap: () => controller.toggleSlot(dayIndex, hour),
-                          child: Chip(
-                            label: Text("$hour h"),
-                            backgroundColor: available ? Colors.green[100] : Colors.red[100],
-                          ),
-                        );
-                      }),
+                    const Text("Statut", style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      _isVisible ? "Vous êtes visible pour les clients" : "Vous êtes invisible",
+                      style: const TextStyle(fontSize: 13, color: Colors.grey),
                     ),
                   ],
-                );
-              }),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFollowersCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Abonnés",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          Obx(() {
-            if (controller.followers.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(
-                  child: Text("Aucun abonné pour le moment"),
                 ),
-              );
-            }
-            return Column(
-              children: controller.followers.map((f) {
-                return ListTile(
-                  leading: CircleAvatar(
-                    child: Text(f["name"][0].toUpperCase()),
-                  ),
-                  title: Text(f["name"]),
-                );
-              }).toList(),
-            );
-          }),
+                Switch(
+                  value: _isVisible,
+                  onChanged: (val) => setState(() => _isVisible = val),
+                  activeColor: const Color(0xFF2563EB),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCreatePost() {
-    final textController = TextEditingController();
-
+  // ==================== MENU CARD ====================
+  Widget _buildMenuCard(IconData icon, Color color, String title, String subtitle) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Row(
         children: [
-          TextField(
-            controller: textController,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: "Partagez votre travail...",
-              border: OutlineInputBorder(),
-            ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: color),
           ),
-          const SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: () {
-              controller.createPost(textController.text, null);
-              textController.clear();
-            },
-            child: const Text("Publier"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPostsList() {
-    return Obx(() {
-      if (controller.posts.isEmpty) {
-        return Container(
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Center(
-            child: Text("Aucune publication. Créez votre première publication!"),
-          ),
-        );
-      }
-
-      return Column(
-        children: controller.posts.map((post) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (post.image.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      post.image,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          height: 200,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.broken_image, size: 50),
-                        );
-                      },
-                    ),
-                  ),
-                const SizedBox(height: 8),
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, color: Colors.grey),
+        ],
+      ),
+    );
+  }
+
+  // ==================== CALENDAR ====================
+  Widget _buildCalendar() {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Calendrier - Mai 2026", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 12),
+          _buildCalendarGrid(),
+          const SizedBox(height: 12),
+          const Text("• Appuyez une fois = Vert / Rouge", style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const Text("• Appuyez deux fois = Ajouter une note", style: TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 7,
+        childAspectRatio: 1.1,
+      ),
+      itemCount: 35,
+      itemBuilder: (context, index) {
+        final day = index + 1;
+        if (day > 31) return const SizedBox.shrink();
+
+        final date = DateTime(2026, 5, day);
+        final status = _dayStatus[date];
+        final isAvailable = status?['available'] ?? true;
+        final hasNote = status?['note']?.isNotEmpty ?? false;
+
+        return GestureDetector(
+          onTap: () => _toggleDay(date),
+          onDoubleTap: () => _openNoteDialog(date),
+          child: Container(
+            margin: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: isAvailable ? Colors.green.shade100 : Colors.red.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
                 Text(
-                  post.content,
-                  style: const TextStyle(fontSize: 14),
+                  day.toString(),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isAvailable ? Colors.green.shade900 : Colors.red.shade900,
+                  ),
                 ),
-                const SizedBox(height: 8),
+                if (hasNote)
+                  const Positioned(bottom: 4, right: 6, child: Text("📝", style: TextStyle(fontSize: 14))),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ==================== FOLLOWERS ====================
+  Widget _buildFollowersList() {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          _buildFollowerItem("Marie Dubois"),
+          const Divider(height: 24),
+          _buildFollowerItem("Pierre Leroy"),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFollowerItem(String fullName) {
+    List<String> names = fullName.split(' ');
+    String initials = names.length >= 2 ? "${names[0][0]}${names[1][0]}" : names[0].substring(0, 2).toUpperCase();
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 22,
+          backgroundColor: const Color(0xFF2563EB),
+          child: Text(initials, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Text(fullName, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15))),
+        ElevatedButton(
+          onPressed: () => Get.snackbar("Profil", "Profil de $fullName ouvert"),
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
+          child: const Text("Voir profil", style: TextStyle(color: Colors.white, fontSize: 13)),
+        ),
+      ],
+    );
+  }
+
+  // ==================== CREATE POST ====================
+  Widget _buildCreatePostSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Créer une publication", style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          const TextField(
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: "Partagez votre dernier projet...",
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: const Text("Ajouter une photo"),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    alignment: Alignment.center,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Get.snackbar("Succès", "Publication publiée !"),
+                  child: const Text("Publier", style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  // ==================== MES PUBLICATIONS ====================
+  Widget _buildPublicationCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: Image.network(
+              "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=800",
+              height: 220,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Installation d'une nouvelle salle de bain complète avec robinetterie moderne et carrelage italien. Projet réalisé en 5 jours.",
+                  style: const TextStyle(fontSize: 15, height: 1.4),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      _formatDate(post.createdAt),
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                    TextButton(
-                      onPressed: () => controller.deletePost(post.idPost),
-                      child: const Text("Supprimer", style: TextStyle(color: Colors.red)),
+                    const Text("Il y a 2 heures", style: TextStyle(color: Colors.grey)),
+                    Row(
+                      children: [
+                        const Icon(Icons.favorite, color: Colors.red, size: 18),
+                        const SizedBox(width: 4),
+                        Text("45", style: const TextStyle(fontWeight: FontWeight.w500)),
+                        const SizedBox(width: 16),
+                        const Icon(Icons.comment, color: Colors.grey, size: 18),
+                        const SizedBox(width: 4),
+                        const Text("8"),
+                      ],
                     ),
                   ],
                 ),
               ],
             ),
-          );
-        }).toList(),
-      );
-    });
+          ),
+        ],
+      ),
+    );
   }
-
-  String _formatDate(DateTime date) {
-    return "${date.day}/${date.month}/${date.year}";
-  }
+}
 
   Widget _buildQrDialog() {
     return AlertDialog(
       title: const Text("QR Code"),
-      content: const Icon(Icons.qr_code, size: 120),
-      actions: [
-        TextButton(
-          onPressed: () => Get.back(),
-          child: const Text("Fermer"),
-        ),
-      ],
+      content: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.qr_code, size: 180, color: Color(0xFF2563EB)),
+          SizedBox(height: 10),
+          Text("Partagez ce code avec vos clients", textAlign: TextAlign.center),
+        ],
+      ),
+      actions: [TextButton(onPressed: () => Get.back(), child: const Text("Fermer"))],
     );
   }
-}

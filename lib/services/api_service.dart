@@ -7,7 +7,7 @@ class ApiService {
   // ============================================================
   // BASE URL - FOR ANDROID EMULATOR
   // ============================================================
-  static const String baseUrl = 'http://192.168.1.37:8081/api/v1';
+  static const String baseUrl = 'http://192.168.1.36:8081/api/v1';
   // FOR PHYSICAL DEVICE (uncomment and use your computer's IP):
   // static const String baseUrl = 'http://192.168.1.36:8081/api/v1';
 
@@ -277,9 +277,9 @@ class ApiService {
     return await get('/auth/me');
   }
 
-  // ============================================================
-  // ARTISAN ENDPOINTS
-  // ============================================================
+// ============================================================
+// ARTISAN ENDPOINTS (IMPROVED)
+// ============================================================
 
   static Future<List<dynamic>> getArtisans({
     String? category,
@@ -287,14 +287,47 @@ class ApiService {
     double? rating,
     String? search,
   }) async {
-    final params = <String, dynamic>{};
-    if (category != null) params['category'] = category;
-    if (province != null) params['province'] = province;
-    if (rating != null) params['rating'] = rating;
-    if (search != null) params['search'] = search;
+    try {
+      String endpoint = '/artisans';
 
-    return await get('/artisans');
+      final queryParams = <String, String>{};
+
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+      if (category != null && category.isNotEmpty && category != 'all') {
+        queryParams['category'] = category;
+      }
+      if (province != null && province.isNotEmpty) {
+        queryParams['province'] = province;
+      }
+      if (rating != null && rating > 0) {
+        queryParams['rating'] = rating.toString();
+      }
+
+      // Build URL with query parameters
+      if (queryParams.isNotEmpty) {
+        endpoint += '?';
+        endpoint += queryParams.entries
+            .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+            .join('&');
+      }
+
+      debugPrint('📤 GET Artisans: $baseUrl$endpoint');
+
+      final response = await get(endpoint); // Reuse your existing get() method
+
+      if (response is List) {
+        return response;
+      } else {
+        return [];
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching artisans: $e');
+      return [];
+    }
   }
+  // Add these methods inside ApiService class
 
   static Future<Map<String, dynamic>> getArtisanById(int id) async {
     return await get('/artisans/$id');
@@ -303,7 +336,6 @@ class ApiService {
   static Future<Map<String, dynamic>> updateArtisan(int id, Map<String, dynamic> data) async {
     return await put('/artisans/$id', data);
   }
-
   // ============================================================
   // POST ENDPOINTS
   // ============================================================

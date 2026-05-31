@@ -5,6 +5,7 @@ class AppRoutes {
   static const registerClient = "/register-client";
   static const registerArtisan = "/register-artisan";
   static const clientHome = "/client-home";
+  static const String clientRequests = '/client-requests';   // ← NEW
   static const artisanHome = "/artisan-home";
   static const artisanPrivateProfile = "/artisan-private-profile"; // ADD THIS
   static const artisanProfile = "/artisan-profile";
@@ -15,4 +16,5 @@ class AppRoutes {
   static const reservations = "/reservations";
   static const settings = "/settings";
   static const qrScan = "/qr-scan";
+  static const String clientPublicProfile = '/client-public-profile';
 }
