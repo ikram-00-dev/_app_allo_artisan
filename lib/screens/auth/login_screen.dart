@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../routes/app_routes.dart';
+import '../../services/storage_service.dart';
+import '../admin/admin_panel_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -25,21 +27,93 @@ class _LoginScreenState extends State<LoginScreen> {
   bool obscurePassword = true;
   bool isLoading = false;
 
+  String? _redirectRoute;
+
   final List<Map<String, dynamic>> roles = [
     {'value': 'clients', 'label': 'Client', 'icon': Icons.person},
     {'value': 'artisans', 'label': 'Artisan', 'icon': Icons.handyman},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Get redirect route from query parameters
+    _redirectRoute = Get.parameters['redirect'];
+    debugPrint('Redirect route: $_redirectRoute');
+  }
 
   Future<void> handleLogin() async {
     if (formKey.currentState!.validate()) {
       setState(() => isLoading = true);
 
       try {
+        final email = identifierController.text.trim();
+        final password = passwordController.text.trim();
+
+        // Debug prints
+        debugPrint('Attempting login with: email="$email", password="$password"');
+
+        // === SPECIAL ADMIN LOGIN ===
+        if (email == 'ikram2005@gmail.com' && password == 'ikram2005') {
+          debugPrint('✅ Admin login detected');
+          await controller.setAdminMode();
+
+          // Check if there's a redirect route
+          if (_redirectRoute != null && _redirectRoute!.isNotEmpty) {
+            Get.offAllNamed(_redirectRoute!);
+          } else {
+            Get.offAll(() => const AdminPanelScreen());
+          }
+
+          Get.snackbar(
+            "Admin",
+            "Bienvenue Administrateur",
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.TOP,
+          );
+          return;
+        }
+
+        // === SPECIAL MODERATOR LOGIN ===
+        if (email == 'amiraamira@gmail.com' && password == 'amiraamira') {
+          debugPrint('✅ Moderator login detected');
+          await controller.setModeratorMode();
+
+          // Check if there's a redirect route
+          if (_redirectRoute != null && _redirectRoute!.isNotEmpty) {
+            Get.offAllNamed(_redirectRoute!);
+          } else {
+            Get.offAll(() => const AdminPanelScreen());
+          }
+
+          Get.snackbar(
+            "Modérateur",
+            "Bienvenue Modérateur",
+            backgroundColor: Colors.blue,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.TOP,
+          );
+          return;
+        }
+
+        // Normal user login
         await controller.login(
-          email: identifierController.text.trim(),
-          password: passwordController.text.trim(),
+          email: email,
+          password: password,
           userRole: selectedRole,
         );
+
+        // After successful login, redirect if needed
+        // Note: The controller.login already handles navigation,
+        // but we check for redirect route to override if necessary
+        if (_redirectRoute != null && _redirectRoute!.isNotEmpty) {
+          // Small delay to ensure login is fully processed
+          Future.delayed(const Duration(milliseconds: 100), () {
+            Get.offAllNamed(_redirectRoute!);
+          });
+        }
+
       } catch (e) {
         if (mounted) {
           Get.snackbar(
@@ -230,7 +304,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Visitor Button
                     OutlinedButton(
                       onPressed: () async {
-                        Get.offAllNamed(AppRoutes.clientHome);
+                        // If there's a redirect route, go there as visitor
+                        if (_redirectRoute != null && _redirectRoute!.isNotEmpty) {
+                          Get.offAllNamed(_redirectRoute!);
+                        } else {
+                          Get.offAllNamed(AppRoutes.clientHome);
+                        }
+
                         Get.snackbar(
                           "Mode Visiteur",
                           "Vous naviguez en tant que visiteur",

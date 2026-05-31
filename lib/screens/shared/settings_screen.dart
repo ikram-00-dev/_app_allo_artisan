@@ -70,17 +70,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadProfileData();
   }
 
-  void _loadProfileData() {
-    final user = authController.user.value;
-    if (user != null) {
-      _nameController.text = user['name'] ?? user['firstName'] ?? '';
-      _phoneController.text = user['phoneNumber'] ?? user['phone'] ?? '';
-      _zoneController.text = user['zone'] ?? user['district'] ?? '';
-      _bioController.text = user['bio'] ??
-          (authController.isArtisan ? "Artisan professionnel avec plusieurs années d'expérience" : "");
-      _birthdateController.text = user['birthdate'] ?? '';
-      _locationController.text = user['location'] ??
-          (user['city'] != null ? "${user['city']}, ${user['province']}" : '');
+  Future<void> _loadProfileData() async {
+    try {
+      final profile = await ApiService.getCurrentUserProfile();
+
+      setState(() {
+        _nameController.text = "${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}".trim();
+        _phoneController.text = profile['phoneNumber'] ?? '';
+        _zoneController.text = profile['district'] ?? profile['zone'] ?? '';
+        _bioController.text = profile['bio'] ?? '';
+        _locationController.text = "${profile['city'] ?? ''}, ${profile['province'] ?? ''}".trim();
+        // Add more fields as needed
+      });
+    } catch (e) {
+      print('Error loading profile: $e');
+      Get.snackbar("Erreur", "Impossible de charger le profil");
     }
   }
 

@@ -5,6 +5,7 @@ import '../../controllers/auth_controller.dart';
 import '../../routes/app_routes.dart';
 import '../client/artisan_profile_screen.dart';
 import 'package:allo_artisan_gpt/screens/client/client_requests_screen.dart';
+import 'package:allo_artisan_gpt/core/widgets/restricted_access_card.dart'; // Add this import
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -28,7 +29,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   final List<Map<String, dynamic>> publications = [
     {
       "id": "1",
-      "artisanId": 1,                    // ← Added
+      "artisanId": 1,
       "name": "Jawad Ben Yahya",
       "category": "Plomberie",
       "rating": 4.8,
@@ -41,7 +42,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     },
     {
       "id": "2",
-      "artisanId": 2,                    // ← Added
+      "artisanId": 2,
       "name": "Ahmed Amerani",
       "category": "Électricité",
       "rating": 4.9,
@@ -53,6 +54,21 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       "image": "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800",
     },
   ];
+
+  // Add this method to show restricted card
+  void _showRestrictedCard() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: RestrictedAccessCard(
+          message: 'Connectez-vous ou créez un compte pour accéder à cette fonctionnalité.',
+        ),
+      ),
+    );
+  }
+
   // Navigate to Artisan Profile
   void _goToArtisanProfile(int artisanId) {
     if (artisanId > 0) {
@@ -89,7 +105,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   void toggleLike(String id) {
     if (!authController.isLoggedIn) {
-      setState(() => _showLoginModal = true);
+      _showRestrictedCard();
       return;
     }
     setState(() {
@@ -102,10 +118,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 
   void handleRestrictedAction() {
-    setState(() => _showLoginModal = true);
+    _showRestrictedCard();
   }
 
   void handleSubmitRequest() {
+    if (!authController.isLoggedIn) {
+      _showRestrictedCard();
+      return;
+    }
+
     if (_selectedCategory.isEmpty || _requestDescription.isEmpty) {
       Get.snackbar(
         'Erreur',
@@ -133,24 +154,43 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 
   void onNavBarTapped(int index) {
+    // Check if user is logged in for protected routes
+    final isLoggedIn = authController.isLoggedIn;
+
     switch (index) {
       case 0:
-        break; // Already on home
+        break; // Already on home - always accessible
 
-      case 1: // My Demands
-        Get.toNamed(AppRoutes.clientRequests);
+      case 1: // My Demands / Reservations
+        if (!isLoggedIn) {
+          _showRestrictedCard();
+        } else {
+          Get.toNamed(AppRoutes.clientRequests);
+        }
         break;
 
-      case 2:
-        Get.toNamed(AppRoutes.messages);
+      case 2: // Messages
+        if (!isLoggedIn) {
+          _showRestrictedCard();
+        } else {
+          Get.toNamed(AppRoutes.messages);
+        }
         break;
 
-      case 3:
-        Get.toNamed(AppRoutes.notifications);
+      case 3: // Notifications
+        if (!isLoggedIn) {
+          _showRestrictedCard();
+        } else {
+          Get.toNamed(AppRoutes.notifications);
+        }
         break;
 
-      case 4:
-        Get.toNamed(AppRoutes.profile);
+      case 4: // Profile
+        if (!isLoggedIn) {
+          _showRestrictedCard();
+        } else {
+          Get.toNamed(AppRoutes.profile);
+        }
         break;
     }
   }
@@ -181,7 +221,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   ElevatedButton(
                     onPressed: () {
                       if (!isLoggedIn) {
-                        setState(() => _showLoginModal = true);
+                        _showRestrictedCard();
                       } else {
                         setState(() => _showRequestModal = true);
                       }
@@ -222,7 +262,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             // Request Modal
             if (_showRequestModal) _buildRequestModal(),
 
-            // Login Modal
+            // Login Modal (keep for backward compatibility but won't be used much)
             if (_showLoginModal) _buildLoginModal(),
           ],
         ),
@@ -460,6 +500,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       ),
     );
   }
+
   Widget _buildRequestModal() {
     return GestureDetector(
       onTap: () => setState(() => _showRequestModal = false),
@@ -657,6 +698,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       ),
     );
   }
+
   void _handleSubmitRequest() {
     // Validation
     if (_selectedCategory.isEmpty) {
@@ -690,7 +732,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       _selectedCategory = 'Plomberie';
       isUrgent = false;
     });
-  }  Widget _buildTypeButton({
+  }
+
+  Widget _buildTypeButton({
     required String label,
     required IconData icon,
     required bool isSelected,

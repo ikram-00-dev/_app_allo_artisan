@@ -1,7 +1,9 @@
+// lib/screens/client/client_requests_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/auth_controller.dart';
 import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
+import '../../routes/app_routes.dart';
 
 class ClientRequestsScreen extends StatefulWidget {
   const ClientRequestsScreen({super.key});
@@ -100,6 +102,14 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
         foregroundColor: Colors.black,
         elevation: 0,
         automaticallyImplyLeading: false,
+        // Add back button to return to Client Home
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () {
+            Get.offAllNamed(AppRoutes.clientHome);
+          },
+          tooltip: 'Retour à l\'accueil',
+        ),
       ),
       backgroundColor: Colors.grey.shade50,
       bottomNavigationBar: const BottomNavBar(currentIndex: 1),

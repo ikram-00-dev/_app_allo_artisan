@@ -205,6 +205,7 @@ class ApiService {
     return response;
   }
 
+  // api_service.dart - Fix register methods
   static Future<Map<String, dynamic>> registerClient({
     required String firstName,
     String? middleName,
@@ -260,8 +261,8 @@ class ApiService {
       'password': password,
       'phoneNumber': phoneNumber,
       'avatarUrl': avatarUrl ?? '',
-      'diplomaUrl': diplomaUrl ?? '',
-      'officialDocUrl': officialDocUrl ?? '',
+      'diploma': diplomaUrl ?? '',      // Changed from diplomaUrl to diploma
+      'officialDoc': officialDocUrl ?? '', // Changed from officialDocUrl to officialDoc
       'category': category,
       'province': province,
       'city': city,
@@ -272,8 +273,9 @@ class ApiService {
     debugPrint('✅ Artisan registered successfully');
     return response;
   }
-
+  // ✅ ADD THIS METHOD - It's missing or not properly defined
   static Future<Map<String, dynamic>> getCurrentUser() async {
+    debugPrint('👤 Getting current user from: $baseUrl/auth/me');
     return await get('/auth/me');
   }
 
@@ -406,5 +408,143 @@ class ApiService {
 
   static Future<void> markNotificationAsRead(int id) async {
     await put('/notifications/$id', {'isRead': true});
+  }
+  // Add to api_service.dart
+
+
+  // lib/services/api_service.dart
+// Add/update these methods:
+
+// ============================================================
+// IMPROVED FILE UPLOAD METHODS
+// ============================================================
+
+  static Future<String> uploadImage(String filePath) async {
+    try {
+      final uri = Uri.parse('$baseUrl/upload/image');
+      final request = http.MultipartRequest('POST', uri);
+
+      // Add file
+      final file = await http.MultipartFile.fromPath('file', filePath);
+      request.files.add(file);
+
+      // ✅ Allow uploads without token during registration
+      final token = await StorageService.getToken();
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+
+      // Add other headers
+      request.headers['Accept'] = 'application/json';
+
+      print('📤 Uploading image to: $uri');
+      print('📤 File: ${file.filename}, Size: ${await file.length} bytes');
+
+      // Send request with timeout
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final responseBody = await response.stream.bytesToString();
+
+      print('📥 Upload response status: ${response.statusCode}');
+      print('📥 Upload response body: $responseBody');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(responseBody);
+
+        if (decoded['url'] != null) {
+          return decoded['url'];
+        } else if (decoded['fileUrl'] != null) {
+          return decoded['fileUrl'];
+        } else if (decoded['path'] != null) {
+          return decoded['path'];
+        } else {
+          throw Exception('No URL in response: $responseBody');
+        }
+      } else {
+        // Handle authentication errors
+        if (response.statusCode == 401) {
+          throw Exception('Session expired. Please login again.');
+        }
+        throw Exception('Upload failed with status ${response.statusCode}: $responseBody');
+      }
+    } catch (e) {
+      print('❌ Upload error: $e');
+      rethrow;
+    }
+  }
+
+  static Future<String> uploadDocument(String filePath) async {
+    try {
+      final uri = Uri.parse('$baseUrl/upload/document');
+      final request = http.MultipartRequest('POST', uri);
+
+      // Add file
+      final file = await http.MultipartFile.fromPath('file', filePath);
+      request.files.add(file);
+
+      // ✅ Allow uploads without token during registration
+      final token = await StorageService.getToken();
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      // Add other headers
+      request.headers['Accept'] = 'application/json';
+
+      print('📤 Uploading document to: $uri');
+      print('📤 File: ${file.filename}, Size: ${await file.length} bytes');
+
+      // Send request with timeout
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final responseBody = await response.stream.bytesToString();
+
+      print('📥 Upload response status: ${response.statusCode}');
+      print('📥 Upload response body: $responseBody');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(responseBody);
+
+        if (decoded['url'] != null) {
+          return decoded['url'];
+        } else if (decoded['fileUrl'] != null) {
+          return decoded['fileUrl'];
+        } else if (decoded['path'] != null) {
+          return decoded['path'];
+        } else {
+          throw Exception('No URL in response: $responseBody');
+        }
+      } else {
+        // Handle authentication errors
+        if (response.statusCode == 401) {
+          throw Exception('Session expired. Please login again.');
+        }
+        throw Exception('Upload failed with status ${response.statusCode}: $responseBody');
+      }
+    } catch (e) {
+      print('❌ Upload error: $e');
+      rethrow;
+    }
+  }
+  // ============================================================
+// PROFILE ENDPOINTS
+// ============================================================
+
+  static Future<Map<String, dynamic>> getCurrentUserProfile() async {
+    try {
+      return await get('/auth/me'); // or '/users/me' depending on your backend
+    } catch (e) {
+      print('Error fetching current user: $e');
+      rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>> getArtisanProfile(int id) async {
+    return await get('/artisans/$id');
+  }
+
+  static Future<Map<String, dynamic>> getClientProfile(int id) async {
+    return await get('/clients/$id');
+  }
+
+  static Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    return await put('/users/profile', data);
   }
 }

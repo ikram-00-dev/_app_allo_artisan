@@ -20,7 +20,12 @@ import '../models/client.dart';
 import '../models/user.dart';
 import '../services/storage_service.dart';
 import 'app_routes.dart';
-import '../screens/client/client_requests_screen.dart';   // ← ADD THIS LINE
+import '../screens/client/client_requests_screen.dart';
+import '../screens/admin/add_moderator_screen.dart';
+import '../screens/admin/admin_panel_screen.dart';
+import '../screens/admin/pending_artisans_screen.dart';
+import '../middleware/admin_middleware.dart';
+import '../middleware/auth_middleware.dart'; // ADD THIS IMPORT
 
 class AppPages {
   // Helper method to get profile screen based on role
@@ -29,7 +34,7 @@ class AppPages {
     final user = await StorageService.getUser();
 
     if (role == 'artisan') {
-      return  ArtisanPrivateProfileScreen();
+      return ArtisanPrivateProfileScreen();
     } else {
       // Create client object from user data
       final client = Client(
@@ -52,23 +57,66 @@ class AppPages {
   }
 
   static final pages = [
+    // ============================================================
+    // PUBLIC ROUTES (No authentication required)
+    // ============================================================
     GetPage(name: AppRoutes.splash, page: () => const SplashScreen()),
     GetPage(name: AppRoutes.login, page: () => const LoginScreen()),
     GetPage(name: AppRoutes.registerClient, page: () => const RegisterClientScreen()),
     GetPage(name: AppRoutes.registerArtisan, page: () => const RegisterArtisanScreen()),
     GetPage(name: AppRoutes.clientHome, page: () => const ClientHomeScreen()),
     GetPage(name: AppRoutes.artisanHome, page: () => const ArtisanHomeScreen()),
-    // NEW CLIENT REQUESTS SCREEN
-    GetPage(name: AppRoutes.clientRequests, page: () => const ClientRequestsScreen(),),
-    GetPage(name: AppRoutes.artisanPrivateProfile, page: () =>  ArtisanPrivateProfileScreen()),
-    GetPage(name: AppRoutes.artisanProfile, page: () => ArtisanProfileScreen(artisanId: Get.arguments)), // Not const
+    GetPage(name: AppRoutes.artisanProfile, page: () => ArtisanProfileScreen(artisanId: Get.arguments)),
     GetPage(name: AppRoutes.search, page: () => const SearchScreen()),
-    GetPage(name: AppRoutes.messages, page: () => const MessagesScreen()),
-    GetPage(name: AppRoutes.notifications, page: () => const NotificationsScreen()),
-    GetPage(name: AppRoutes.reservations, page: () =>  ReservationScreen()), // Fixed: added const
-    GetPage(name: AppRoutes.settings, page: () => const SettingsScreen()),
     GetPage(name: AppRoutes.qrScan, page: () => const ScanQRScreen()),
-    // Profile route - dynamically loads based on user role
+
+    // ============================================================
+    // PROTECTED ROUTES (Require authentication)
+    // ============================================================
+
+    // Client Requests Screen
+    GetPage(
+      name: AppRoutes.clientRequests,
+      page: () => const ClientRequestsScreen(),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    // Artisan Private Profile
+    GetPage(
+      name: AppRoutes.artisanPrivateProfile,
+      page: () => const ArtisanPrivateProfileScreen(),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    // Messages
+    GetPage(
+      name: AppRoutes.messages,
+      page: () => const MessagesScreen(),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    // Notifications
+    GetPage(
+      name: AppRoutes.notifications,
+      page: () => const NotificationsScreen(),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    // Reservations
+    GetPage(
+      name: AppRoutes.reservations,
+      page: () =>  ReservationScreen(),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    // Settings
+    GetPage(
+      name: AppRoutes.settings,
+      page: () => const SettingsScreen(),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    // Profile - dynamically loads based on user role
     GetPage(
       name: AppRoutes.profile,
       page: () => FutureBuilder(
@@ -87,6 +135,26 @@ class AppPages {
           );
         },
       ),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    // ============================================================
+    // ADMIN ROUTES (Require admin/moderator role)
+    // ============================================================
+    GetPage(
+      name: AppRoutes.adminPanel,
+      page: () => const AdminPanelScreen(),
+      middlewares: [AdminMiddleware()],
+    ),
+    GetPage(
+      name: AppRoutes.pendingArtisans,
+      page: () => const PendingArtisansScreen(),
+      middlewares: [AdminMiddleware()],
+    ),
+    GetPage(
+      name: AppRoutes.addModerator,
+      page: () => const AddModeratorScreen(),
+      middlewares: [AdminMiddleware()],
     ),
   ];
 }

@@ -1,14 +1,18 @@
+// lib/screens/shared/reservations_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/reservation_controller.dart';
 import '../../models/appointment.dart';
 import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
+import '../../routes/app_routes.dart';
+import '../../controllers/auth_controller.dart';
 
 class ReservationScreen extends StatelessWidget {
-   ReservationScreen({super.key});
+  ReservationScreen({super.key});
 
   final ReservationController controller = Get.put(ReservationController());
+  final AuthController authController = Get.find<AuthController>();
 
   // Mock data for when backend is not available
   final List<Map<String, dynamic>> mockReservations = [
@@ -28,7 +32,6 @@ class ReservationScreen extends StatelessWidget {
       'time': '10:00',
       'status': 'confirmed',
     },
-
   ];
 
   Color statusColor(String status) {
@@ -51,6 +54,7 @@ class ReservationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Use mock data for now since backend might not have appointments
     final reservations = mockReservations;
+    final isArtisan = authController.isArtisan;
 
     return Scaffold(
       appBar: AppBar(
@@ -59,6 +63,18 @@ class ReservationScreen extends StatelessWidget {
         foregroundColor: Colors.black,
         elevation: 0,
         automaticallyImplyLeading: false,
+        // Add back button to return to Artisan Home
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () {
+            if (isArtisan) {
+              Get.offAllNamed(AppRoutes.artisanHome);
+            } else {
+              Get.offAllNamed(AppRoutes.clientHome);
+            }
+          },
+          tooltip: 'Retour à l\'accueil',
+        ),
       ),
       backgroundColor: Colors.grey.shade50,
       bottomNavigationBar: const BottomNavBar(currentIndex: 1),

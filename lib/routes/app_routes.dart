@@ -17,4 +17,11 @@ class AppRoutes {
   static const settings = "/settings";
   static const qrScan = "/qr-scan";
   static const String clientPublicProfile = '/client-public-profile';
+  static const adminPanel = "/admin-panel";           // ← NEW
+  static const pendingArtisans = "/pending-artisans"; // ← NEW
+  static const addModerator = "/add-moderator";       // ← NEW
+  // Helper method to get login route with redirect
+  static String getLoginWithRedirect(String redirectRoute) {
+    return '$login?redirect=$redirectRoute';
+  }
 }

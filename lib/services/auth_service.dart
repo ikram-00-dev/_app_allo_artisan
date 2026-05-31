@@ -24,7 +24,7 @@ class AuthService {
   static Future<dynamic> registerClient(
       Map<String, dynamic> data) async {
     return await ApiService.post(
-      '/auth/register/clients',
+      '/auth/register/client',
       data,
     );
   }
@@ -35,7 +35,7 @@ class AuthService {
   static Future<dynamic> registerArtisan(
       Map<String, dynamic> data) async {
     return await ApiService.post(
-      '/auth/register/artisans',
+      '/auth/register/artisan',
       data,
     );
   }

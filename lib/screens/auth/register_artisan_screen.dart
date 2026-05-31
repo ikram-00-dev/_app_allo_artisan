@@ -1,7 +1,10 @@
 // lib/screens/auth/register_artisan_screen.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../controllers/auth_controller.dart';
+import '../../services/api_service.dart';
 
 enum RegistrationStep { form, waiting }
 
@@ -13,7 +16,7 @@ class RegisterArtisanScreen extends StatefulWidget {
 }
 
 class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
-  final authController = Get.find<AuthController>();
+  final auth = Get.find<AuthController>();
 
   RegistrationStep _registrationStep = RegistrationStep.form;
   int _formStep = 1;
@@ -25,7 +28,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     'category': '',
     'province': '',
     'city': '',
-    'district': '',
+    'district': '5km',
     'email': '',
     'phoneNumber': '',
     'password': '',
@@ -33,18 +36,32 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     'diploma': '',
     'officialDoc': '',
     'profileImage': '',
-    'experience': 0,
   };
 
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   bool _isLoading = false;
+  bool _isUploadingProfile = false;
+  bool _isUploadingDiploma = false;
+  bool _isUploadingOfficialDoc = false;
 
-  // ==================== Beautiful & Flexible Lists ====================
+  // Complete list of wilayas
   final List<String> _wilayas = [
-    'Alger', 'Oran', 'Constantine', 'Annaba', 'Blida', 'Batna', 'Djelfa',
-    'Sétif', 'Sidi Bel Abbès', 'Biskra', 'Tébessa', 'El Oued', 'Skikda',
-    'Tizi Ouzou', 'Béjaïa', 'Tlemcen', 'Mostaganem',
+    'Adrar', 'Chlef', 'Laghouat', 'Oum El Bouaghi', 'Batna', 'Béjaïa', 'Biskra',
+    'Béchar', 'Blida', 'Bouira', 'Tamanrasset', 'Tébessa', 'Tlemcen', 'Tiaret',
+    'Tizi Ouzou', 'Alger', 'Djelfa', 'Jijel', 'Sétif', 'Saïda', 'Skikda',
+    'Sidi Bel Abbès', 'Annaba', 'Guelma', 'Constantine', 'Médéa', 'Mostaganem',
+    'M’Sila', 'Mascara', 'Ouargla', 'Oran', 'El Bayadh', 'Illizi',
+    'Bordj Bou Arréridj', 'Boumerdès', 'El Tarf', 'Tindouf', 'Tissemsilt',
+    'El Oued', 'Khenchela', 'Souk Ahras', 'Tipaza', 'Mila', 'Aïn Defla',
+    'Naâma', 'Aïn Témouchent', 'Ghardaïa', 'Relizane', 'Timimoun',
+    'Bordj Badji Mokhtar', 'Ouled Djellal', 'Béni Abbès', 'In Salah',
+    'In Guezzam', 'Touggourt', 'Djanet', 'El M’Ghair', 'El Meniaa'
+  ];
+
+  // Zone radius options
+  final List<String> _zoneRadii = [
+    '5km', '10km', '15km', '20km', '25km', '30km', '35km', '40km', '45km', '50km'
   ];
 
   final List<String> _categories = [
@@ -53,31 +70,182 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     'Électronique', 'Informatique', 'Cuisine',
   ];
 
-  // Sample zones (you can make this dynamic later based on city)
-  final List<String> _zones = [
-    'Centre-ville', 'Quartier résidentiel', 'HLM', 'Cité nouvelle',
-    'Zone industrielle', 'Banlieue', 'Vieux quartier', 'Lotissement',
-    'Autre',
-  ];
+  final ImagePicker _picker = ImagePicker();
+
+  // File picking methods - using image_picker for ALL files
+  Future<void> _pickProfileImage() async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (file == null) return;
+
+      setState(() => _isUploadingProfile = true);
+
+      final fileUrl = await ApiService.uploadImage(file.path);
+
+      setState(() {
+        _formData['profileImage'] = fileUrl;
+      });
+
+      Get.snackbar(
+        'Succès',
+        'Photo de profil téléchargée avec succès',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+      );
+    } catch (e) {
+      print('❌ Profile Image Upload Error: $e');
+
+      String errorMessage = 'Échec du téléchargement';
+      if (e.toString().contains('token') || e.toString().contains('auth')) {
+        errorMessage = 'Vous devez être connecté pour uploader des fichiers';
+      } else if (e.toString().contains('Broken pipe') || e.toString().contains('SocketException')) {
+        errorMessage = 'Erreur de connexion au serveur';
+      } else if (e.toString().contains('404')) {
+        errorMessage = 'Route de téléchargement non trouvée';
+      }
+
+      Get.snackbar(
+        'Erreur',
+        '$errorMessage\n\n${e.toString().substring(0, 120)}...',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+    } finally {
+      setState(() => _isUploadingProfile = false);
+    }
+  }
+
+  Future<void> _pickDiploma() async {
+    try {
+      final XFile? file = await _picker.pickMedia();
+
+      if (file == null) return;
+
+      setState(() => _isUploadingDiploma = true);
+
+      final extension = file.path.split('.').last.toLowerCase();
+      String fileUrl;
+
+      if (extension == 'pdf') {
+        fileUrl = await ApiService.uploadDocument(file.path);
+      } else {
+        fileUrl = await ApiService.uploadImage(file.path);
+      }
+
+      setState(() {
+        _formData['diploma'] = fileUrl;
+      });
+
+      Get.snackbar(
+        'Succès',
+        'Diplôme téléchargé avec succès: ${file.name}',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      print('❌ Diploma Upload Error: $e');
+
+      String errorMessage = 'Échec du téléchargement du diplôme';
+      if (e.toString().contains('token') || e.toString().contains('auth')) {
+        errorMessage = 'Problème d\'authentification';
+      } else if (e.toString().contains('Broken pipe') || e.toString().contains('SocketException')) {
+        errorMessage = 'Erreur de connexion au serveur';
+      }
+
+      Get.snackbar(
+        'Erreur',
+        '$errorMessage\n\n${e.toString().substring(0, 100)}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+      );
+    } finally {
+      setState(() => _isUploadingDiploma = false);
+    }
+  }
+
+  Future<void> _pickOfficialDoc() async {
+    try {
+      final XFile? file = await _picker.pickMedia();
+
+      if (file == null) return;
+
+      setState(() => _isUploadingOfficialDoc = true);
+
+      final extension = file.path.split('.').last.toLowerCase();
+      String fileUrl;
+
+      if (extension == 'pdf') {
+        fileUrl = await ApiService.uploadDocument(file.path);
+      } else {
+        fileUrl = await ApiService.uploadImage(file.path);
+      }
+
+      setState(() {
+        _formData['officialDoc'] = fileUrl;
+      });
+
+      Get.snackbar(
+        'Succès',
+        'Document officiel téléchargé avec succès: ${file.name}',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      print('❌ Official Document Upload Error: $e');
+
+      String errorMessage = 'Échec du téléchargement du document officiel';
+      if (e.toString().contains('token') || e.toString().contains('auth')) {
+        errorMessage = 'Problème d\'authentification';
+      } else if (e.toString().contains('Broken pipe') || e.toString().contains('SocketException')) {
+        errorMessage = 'Erreur de connexion au serveur';
+      } else if (e.toString().contains('404')) {
+        errorMessage = 'Route de téléchargement non trouvée (404)';
+      }
+
+      Get.snackbar(
+        'Erreur',
+        '$errorMessage\n\n${e.toString().substring(0, 100)}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+      );
+    } finally {
+      setState(() => _isUploadingOfficialDoc = false);
+    }
+  }
 
   void _nextStep() {
     if (_formStep == 1) {
-      if (_formData['firstName'].toString().trim().isEmpty ||
-          _formData['lastName'].toString().trim().isEmpty ||
-          _formData['category'].toString().isEmpty ||
-          _formData['province'].toString().isEmpty ||
-          _formData['city'].toString().trim().isEmpty ||
-          _formData['district'].toString().isEmpty) {
+      if (_formData['firstName'].isEmpty ||
+          _formData['lastName'].isEmpty ||
+          _formData['category'].isEmpty ||
+          _formData['province'].isEmpty ||
+          _formData['city'].isEmpty) {
         _showError('Veuillez remplir tous les champs obligatoires');
         return;
       }
     } else if (_formStep == 2) {
-      // Documents are optional - no validation
+      if (_formData['diploma'].toString().isEmpty) {
+        _showError('Veuillez télécharger votre diplôme/certification');
+        return;
+      }
+      if (_formData['officialDoc'].toString().isEmpty) {
+        _showError('Veuillez télécharger votre document officiel');
+        return;
+      }
     } else if (_formStep == 3) {
-      if (_formData['email'].toString().trim().isEmpty ||
-          _formData['phoneNumber'].toString().trim().isEmpty ||
-          _formData['password'].toString().isEmpty ||
-          _formData['confirmPassword'].toString().isEmpty) {
+      if (_formData['email'].isEmpty && _formData['phoneNumber'].isEmpty) {
+        _showError('Veuillez fournir au moins un email ou un numéro de téléphone');
+        return;
+      }
+      if (_formData['password'].isEmpty || _formData['confirmPassword'].isEmpty) {
         _showError('Veuillez remplir tous les champs');
         return;
       }
@@ -88,38 +256,45 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
       _submitRegistration();
       return;
     }
+
     setState(() => _formStep++);
   }
 
   void _previousStep() {
-    if (_formStep > 1) setState(() => _formStep--);
+    if (_formStep > 1) {
+      setState(() => _formStep--);
+    }
   }
 
   void _showError(String message) {
-    Get.snackbar("Erreur", message,
-        backgroundColor: Colors.red, colorText: Colors.white);
+    Get.snackbar(
+      "Erreur",
+      message,
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
   }
 
   Future<void> _submitRegistration() async {
     setState(() => _isLoading = true);
 
-    final String username = '${_formData['firstName'].toString().toLowerCase()}_${_formData['lastName'].toString().toLowerCase()}';
+    final String finalUsername = '${_formData['firstName'].toLowerCase()}_${_formData['lastName'].toLowerCase()}';
 
-    final success = await authController.registerArtisan(
+    final success = await auth.registerArtisan(
       firstName: _formData['firstName'],
       lastName: _formData['lastName'],
-      username: username,
-      email: _formData['email'],
+      username: finalUsername,
+      email: _formData['email'].toString().isNotEmpty ? _formData['email'] : null,
+      phoneNumber: _formData['phoneNumber'].toString().isNotEmpty ? _formData['phoneNumber'] : null,
       password: _formData['password'],
-      phoneNumber: _formData['phoneNumber'],
       category: _formData['category'],
       province: _formData['province'],
       city: _formData['city'],
       district: _formData['district'],
+      diplomaUrl: _formData['diploma'].toString(),
+      officialDocUrl: _formData['officialDoc'].toString(),
       avatarUrl: _formData['profileImage'].toString().isNotEmpty ? _formData['profileImage'] : null,
-      diplomaUrl: _formData['diploma'].toString().isNotEmpty ? _formData['diploma'] : null,
-      officialDocUrl: _formData['officialDoc'].toString().isNotEmpty ? _formData['officialDoc'] : null,
-      experience: _formData['experience'] ?? 0,
+      experience: null,
     );
 
     setState(() => _isLoading = false);
@@ -129,116 +304,185 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     }
   }
 
-  // Beautiful Dropdown Style
-  InputDecoration _inputDecoration(String label, {IconData? icon}) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: icon != null ? Icon(icon, color: const Color(0xFF2563EB)) : null,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    );
-  }
-
-  // ============================================================
-  // STEP 1 - Updated with beautiful dropdowns
-  // ============================================================
   Widget _buildStep1() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Profile Image
         Center(
           child: Column(
             children: [
-              const Text('Photo de profil', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'Photo de profil',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               const SizedBox(height: 8),
-              InkWell(
-                onTap: () => Get.snackbar('Info', 'Fonctionnalité à venir'),
-                child: Container(
-                  width: 120, height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF2563EB), width: 3),
-                    color: Colors.grey.shade100,
+              const Text(
+                'Ajoutez une photo pour personnaliser votre profil',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              Stack(
+                children: [
+                  InkWell(
+                    onTap: _pickProfileImage,
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey.shade200,
+                        border: Border.all(color: const Color(0xFF2563EB), width: 2),
+                      ),
+                      child: _formData['profileImage'].toString().isNotEmpty
+                          ? ClipOval(
+                        child: Image.network(
+                          _formData['profileImage'],
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.person, size: 48, color: Colors.grey);
+                          },
+                        ),
+                      )
+                          : const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.camera_alt, size: 32, color: Color(0xFF2563EB)),
+                          SizedBox(height: 8),
+                          Text(
+                            'Ajouter',
+                            style: TextStyle(color: Color(0xFF2563EB), fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: _formData['profileImage'].toString().isNotEmpty
-                      ? ClipOval(child: Image.network(_formData['profileImage'], fit: BoxFit.cover))
-                      : const Icon(Icons.camera_alt, size: 40, color: Color(0xFF2563EB)),
-                ),
+                  if (_isUploadingProfile)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.black54,
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
         ),
-        const SizedBox(height: 32),
-
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
               child: TextFormField(
-                decoration: _inputDecoration('Prénom *', icon: Icons.person),
+                initialValue: _formData['firstName'],
+                decoration: InputDecoration(
+                  labelText: 'Prénom *',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
                 onChanged: (value) => _formData['firstName'] = value,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: TextFormField(
-                decoration: _inputDecoration('Nom *', icon: Icons.person),
+                initialValue: _formData['lastName'],
+                decoration: InputDecoration(
+                  labelText: 'Nom *',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
                 onChanged: (value) => _formData['lastName'] = value,
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
-
         DropdownButtonFormField<String>(
-          value: _formData['category'].isEmpty ? null : _formData['category'],
-          decoration: _inputDecoration('Catégorie *', icon: Icons.category),
-          items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
-          onChanged: (value) => setState(() => _formData['category'] = value ?? ''),
+          value: _formData['category'].toString().isEmpty ? null : _formData['category'],
+          decoration: InputDecoration(
+            labelText: 'Catégorie *',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+          items: _categories.map((cat) {
+            return DropdownMenuItem(value: cat, child: Text(cat));
+          }).toList(),
+          onChanged: (value) {
+            setState(() => _formData['category'] = value ?? '');
+          },
         ),
         const SizedBox(height: 16),
-
-        DropdownButtonFormField<String>(
-          value: _formData['province'].isEmpty ? null : _formData['province'],
-          decoration: _inputDecoration('Wilaya *', icon: Icons.location_city),
-          items: _wilayas.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
-          onChanged: (value) => setState(() => _formData['province'] = value ?? ''),
-        ),
-        const SizedBox(height: 16),
-
         Row(
           children: [
             Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _formData['province'].toString().isEmpty ? null : _formData['province'],
+                decoration: InputDecoration(
+                  labelText: 'Wilaya *',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                items: _wilayas.map((wilaya) {
+                  return DropdownMenuItem(value: wilaya, child: Text(wilaya));
+                }).toList(),
+                onChanged: (value) {
+                  setState(() => _formData['province'] = value ?? '');
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
               child: TextFormField(
-                decoration: _inputDecoration('Baladeya (Commune) *', icon: Icons.location_on),
+                initialValue: _formData['city'],
+                decoration: InputDecoration(
+                  labelText: 'Baladeya (Commune) *',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
                 onChanged: (value) => _formData['city'] = value,
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
-
-        // Zone as Dropdown (New)
         DropdownButtonFormField<String>(
-          value: _formData['district'].isEmpty ? null : _formData['district'],
-          decoration: _inputDecoration('Zone / Quartier *', icon: Icons.place),
-          items: _zones.map((zone) => DropdownMenuItem(value: zone, child: Text(zone))).toList(),
-          onChanged: (value) => setState(() => _formData['district'] = value ?? ''),
+          value: _formData['district'].toString(),
+          decoration: InputDecoration(
+            labelText: 'Zone de service *',
+            hintText: 'Rayon d\'intervention',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+          items: _zoneRadii.map((radius) {
+            return DropdownMenuItem(value: radius, child: Text(radius));
+          }).toList(),
+          onChanged: (value) {
+            setState(() => _formData['district'] = value ?? '5km');
+          },
         ),
       ],
     );
   }
 
-  // ============================================================
-  // STEP 2: Upload documents (Optional)
-  // ============================================================
   Widget _buildStep2() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Official Document Upload
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: Colors.blue.shade200, width: 2),
@@ -261,12 +505,8 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                     Icon(Icons.description, color: Color(0xFF2563EB)),
                     SizedBox(width: 8),
                     Text(
-                      'Document officiel',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Color(0xFF2563EB),
-                      ),
+                      'Document officiel *',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2563EB)),
                     ),
                   ],
                 ),
@@ -281,33 +521,64 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
-                    InkWell(
-                      onTap: () {
-                        Get.snackbar('Info', 'Fonctionnalité à venir');
-                      },
-                      child: Container(
-                        height: 120,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.blue.shade200, width: 2),
-                          borderRadius: BorderRadius.circular(12),
-                          color: Colors.white,
-                        ),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.upload_file, size: 40, color: Color(0xFF2563EB)),
-                            SizedBox(height: 12),
-                            Text(
-                              'Cliquez pour télécharger',
-                              style: TextStyle(color: Color(0xFF2563EB), fontSize: 14),
+                    Stack(
+                      children: [
+                        InkWell(
+                          onTap: _pickOfficialDoc,
+                          child: Container(
+                            height: 120,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.blue.shade200, width: 2),
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white,
                             ),
-                            Text(
-                              'PDF, PNG, JPG (Max 5MB)',
-                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            child: _formData['officialDoc'].toString().isNotEmpty
+                                ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.check_circle, size: 40, color: Colors.green),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Document téléchargé',
+                                  style: TextStyle(color: Colors.green.shade700, fontSize: 12),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Cliquez pour changer',
+                                  style: TextStyle(color: Colors.blue.shade700, fontSize: 11),
+                                ),
+                              ],
+                            )
+                                : const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.upload_file, size: 40, color: Color(0xFF2563EB)),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Cliquez pour télécharger',
+                                  style: TextStyle(color: Color(0xFF2563EB), fontSize: 14),
+                                ),
+                                Text(
+                                  'PDF, PNG, JPG, etc.',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                        if (_isUploadingOfficialDoc)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.black54,
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -316,8 +587,6 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Diploma Upload
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: Colors.blue.shade200, width: 2),
@@ -340,12 +609,8 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                     Icon(Icons.school, color: Color(0xFF2563EB)),
                     SizedBox(width: 8),
                     Text(
-                      'Diplôme / Certification',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Color(0xFF2563EB),
-                      ),
+                      'Diplôme / Certification *',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2563EB)),
                     ),
                   ],
                 ),
@@ -360,33 +625,64 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
-                    InkWell(
-                      onTap: () {
-                        Get.snackbar('Info', 'Fonctionnalité à venir');
-                      },
-                      child: Container(
-                        height: 120,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.blue.shade200, width: 2),
-                          borderRadius: BorderRadius.circular(12),
-                          color: Colors.white,
-                        ),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.upload_file, size: 40, color: Color(0xFF2563EB)),
-                            SizedBox(height: 12),
-                            Text(
-                              'Cliquez pour télécharger',
-                              style: TextStyle(color: Color(0xFF2563EB), fontSize: 14),
+                    Stack(
+                      children: [
+                        InkWell(
+                          onTap: _pickDiploma,
+                          child: Container(
+                            height: 120,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.blue.shade200, width: 2),
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white,
                             ),
-                            Text(
-                              'PDF, PNG, JPG (Max 5MB)',
-                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            child: _formData['diploma'].toString().isNotEmpty
+                                ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.check_circle, size: 40, color: Colors.green),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Diplôme téléchargé',
+                                  style: TextStyle(color: Colors.green.shade700, fontSize: 12),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Cliquez pour changer',
+                                  style: TextStyle(color: Colors.blue.shade700, fontSize: 11),
+                                ),
+                              ],
+                            )
+                                : const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.upload_file, size: 40, color: Color(0xFF2563EB)),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Cliquez pour télécharger',
+                                  style: TextStyle(color: Color(0xFF2563EB), fontSize: 14),
+                                ),
+                                Text(
+                                  'PDF, PNG, JPG, etc.',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                        if (_isUploadingDiploma)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.black54,
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -398,30 +694,43 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     );
   }
 
-  // ============================================================
-  // STEP 3: Compte
-  // ============================================================
   Widget _buildStep3() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextFormField(
-          decoration: _inputDecoration('Email *', icon: Icons.email),
+          initialValue: _formData['email'],
           keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            labelText: 'Email',
+            hintText: 'Optionnel si téléphone fourni',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.white,
+          ),
           onChanged: (value) => _formData['email'] = value,
         ),
         const SizedBox(height: 16),
-
         TextFormField(
-          decoration: _inputDecoration('Numéro de téléphone *', icon: Icons.phone),
+          initialValue: _formData['phoneNumber'],
           keyboardType: TextInputType.phone,
+          decoration: InputDecoration(
+            labelText: 'Numéro de téléphone',
+            hintText: 'Optionnel si email fourni',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.white,
+          ),
           onChanged: (value) => _formData['phoneNumber'] = value,
         ),
         const SizedBox(height: 16),
-
         TextFormField(
           obscureText: !_showPassword,
-          decoration: _inputDecoration('Mot de passe *', icon: Icons.lock).copyWith(
+          decoration: InputDecoration(
+            labelText: 'Mot de passe *',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.white,
             suffixIcon: IconButton(
               icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
               onPressed: () => setState(() => _showPassword = !_showPassword),
@@ -430,10 +739,13 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
           onChanged: (value) => _formData['password'] = value,
         ),
         const SizedBox(height: 16),
-
         TextFormField(
           obscureText: !_showConfirmPassword,
-          decoration: _inputDecoration('Confirmer mot de passe *', icon: Icons.lock).copyWith(
+          decoration: InputDecoration(
+            labelText: 'Confirmer mot de passe *',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.white,
             suffixIcon: IconButton(
               icon: Icon(_showConfirmPassword ? Icons.visibility_off : Icons.visibility),
               onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
@@ -470,18 +782,16 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Inscription en cours',
+                      'Demande envoyée',
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
-                    if (_isLoading)
-                      const CircularProgressIndicator()
-                    else
-                      const Text(
-                        'Votre compte a été créé avec succès!',
-                        style: TextStyle(color: Colors.green),
-                      ),
+                    const Text(
+                      'Votre demande d\'inscription a été envoyée avec succès!',
+                      style: TextStyle(color: Colors.green),
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 24),
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -498,31 +808,17 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Icon(Icons.check_circle, size: 16, color: Colors.blue),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Votre compte est actif',
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
+                          Row(children: [
+                            Icon(Icons.check_circle, size: 16, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Expanded(child: Text('Votre dossier est en cours de vérification', style: TextStyle(fontSize: 13))),
+                          ]),
                           SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(Icons.check_circle, size: 16, color: Colors.blue),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Vous pouvez maintenant vous connecter',
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
+                          Row(children: [
+                            Icon(Icons.check_circle, size: 16, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Expanded(child: Text('Vous recevrez une notification une fois approuvé', style: TextStyle(fontSize: 13))),
+                          ]),
                         ],
                       ),
                     ),
@@ -533,11 +829,9 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                         backgroundColor: const Color(0xFF2563EB),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('Aller à la connexion'),
+                      child: const Text('Retour à la connexion'),
                     ),
                   ],
                 ),
@@ -569,171 +863,44 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ============================================================
-                  // PROGRESS INDICATOR - EQUAL SPACING WITH LABELS UNDER BUBBLES
-                  // ============================================================
-                  Column(
+                  // Progress indicator
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          // Step 1 bubble
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: _formStep >= 1 ? const Color(0xFF2563EB) : Colors.grey.shade200,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '1',
-                                      style: TextStyle(
-                                        color: _formStep >= 1 ? Colors.white : Colors.grey,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Info perso',
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Line between 1 and 2
-                          Expanded(
-                            child: Container(
-                              height: 2,
-                              color: _formStep > 1 ? const Color(0xFF2563EB) : Colors.grey.shade200,
-                            ),
-                          ),
-                          // Step 2 bubble
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: _formStep >= 2 ? const Color(0xFF2563EB) : Colors.grey.shade200,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '2',
-                                      style: TextStyle(
-                                        color: _formStep >= 2 ? Colors.white : Colors.grey,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Documents',
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Line between 2 and 3
-                          Expanded(
-                            child: Container(
-                              height: 2,
-                              color: _formStep > 2 ? const Color(0xFF2563EB) : Colors.grey.shade200,
-                            ),
-                          ),
-                          // Step 3 bubble
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: _formStep >= 3 ? const Color(0xFF2563EB) : Colors.grey.shade200,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '3',
-                                      style: TextStyle(
-                                        color: _formStep >= 3 ? Colors.white : Colors.grey,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Compte',
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                      Expanded(child: Column(children: [
+                        Container(width: 36, height: 36, decoration: BoxDecoration(color: _formStep >= 1 ? const Color(0xFF2563EB) : Colors.grey.shade200, shape: BoxShape.circle),
+                            child: Center(child: Text('1', style: TextStyle(color: _formStep >= 1 ? Colors.white : Colors.grey, fontWeight: FontWeight.bold)))),
+                        const SizedBox(height: 4), const Text('Info perso', style: TextStyle(fontSize: 11)),
+                      ])),
+                      Expanded(child: Container(height: 2, color: _formStep > 1 ? const Color(0xFF2563EB) : Colors.grey.shade200)),
+                      Expanded(child: Column(children: [
+                        Container(width: 36, height: 36, decoration: BoxDecoration(color: _formStep >= 2 ? const Color(0xFF2563EB) : Colors.grey.shade200, shape: BoxShape.circle),
+                            child: Center(child: Text('2', style: TextStyle(color: _formStep >= 2 ? Colors.white : Colors.grey, fontWeight: FontWeight.bold)))),
+                        const SizedBox(height: 4), const Text('Documents', style: TextStyle(fontSize: 11)),
+                      ])),
+                      Expanded(child: Container(height: 2, color: _formStep > 2 ? const Color(0xFF2563EB) : Colors.grey.shade200)),
+                      Expanded(child: Column(children: [
+                        Container(width: 36, height: 36, decoration: BoxDecoration(color: _formStep >= 3 ? const Color(0xFF2563EB) : Colors.grey.shade200, shape: BoxShape.circle),
+                            child: Center(child: Text('3', style: TextStyle(color: _formStep >= 3 ? Colors.white : Colors.grey, fontWeight: FontWeight.bold)))),
+                        const SizedBox(height: 4), const Text('Compte', style: TextStyle(fontSize: 11)),
+                      ])),
                     ],
                   ),
                   const SizedBox(height: 32),
 
-                  // Form steps
                   if (_formStep == 1) _buildStep1(),
                   if (_formStep == 2) _buildStep2(),
                   if (_formStep == 3) _buildStep3(),
 
                   const SizedBox(height: 24),
-
-                  // Navigation buttons
                   Row(
                     children: [
-                      if (_formStep > 1)
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _previousStep,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              side: const BorderSide(color: Color(0xFF2563EB)),
-                            ),
-                            child: const Text('Précédent'),
-                          ),
-                        ),
+                      if (_formStep > 1) Expanded(child: OutlinedButton(onPressed: _previousStep, style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), side: const BorderSide(color: Color(0xFF2563EB))), child: const Text('Précédent'))),
                       if (_formStep > 1) const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _nextStep,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: _isLoading && _formStep == 3
-                              ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                              : Text(_formStep == 3 ? "S'inscrire" : 'Suivant'),
-                        ),
-                      ),
+                      Expanded(child: ElevatedButton(
+                        onPressed: (_isUploadingDiploma || _isUploadingOfficialDoc || _isUploadingProfile) ? null : _nextStep,
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                        child: _isLoading && _formStep == 3 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white))) : Text(_formStep == 3 ? "S'inscrire" : 'Suivant'),
+                      )),
                     ],
                   ),
                 ],

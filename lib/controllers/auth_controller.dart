@@ -31,9 +31,38 @@ class AuthController extends GetxController {
       _navigateBasedOnRole(role.value);
     }
   }
+  // Add this method to AuthController class
+  Future<void> setAdminMode() async {
+    role.value = 'admin';
+    await StorageService.saveRole('admin');
+    token.value = 'admin_token'; // Placeholder token
+    user.value = {
+      'email': 'ikram2005@gmail.com',
+      'role': 'admin',
+      'firstName': 'Admin',
+      'lastName': 'System',
+    };
+    await StorageService.saveUser(user.value!);
+  }
+
+
+  // Add this method to AuthController class
+  Future<void> setModeratorMode() async {
+    role.value = 'moderator';
+    await StorageService.saveRole('moderator');
+    token.value = 'moderator_session_token';
+    user.value = {
+      'email': 'amiraamira@gmail.com',
+      'role': 'moderator',
+      'firstName': 'Amira',
+      'lastName': 'Moderator',
+    };
+    await StorageService.saveUser(user.value!);
+    debugPrint('✅ Moderator mode set in AuthController');
+  }
 
   // ============================================================
-  // SWITCH ROLE - ADDED THIS METHOD
+  // SWITCH ROLE
   // ============================================================
   Future<void> switchRole(String newRole) async {
     try {
@@ -84,7 +113,7 @@ class AuthController extends GetxController {
   }
 
   // ============================================================
-  // LOGIN - FIXED to use selected role
+  // LOGIN
   // ============================================================
   Future<bool> login({
     required String email,
@@ -167,31 +196,54 @@ class AuthController extends GetxController {
     }
   }
 
-  // In auth_controller.dart, update registerClient and registerArtisan methods:
-
+  // ============================================================
+  // REGISTER CLIENT - UPDATED to make email and phone optional (at least one required)
+  // ============================================================
   Future<bool> registerClient({
     required String firstName,
     String? middleName,
     required String lastName,
     required String username,
-    required String email,
+    String? email,  // Made nullable
+    String? phoneNumber,  // Made nullable
     required String password,
-    required String phoneNumber,
     String? avatarUrl,
   }) async {
     try {
+      // Validate that at least email OR phone is provided
+      if ((email == null || email.trim().isEmpty) &&
+          (phoneNumber == null || phoneNumber.trim().isEmpty)) {
+        Get.snackbar(
+          "Erreur",
+          "Veuillez fournir au moins un email ou un numéro de téléphone",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+
       isLoading.value = true;
 
-      debugPrint('Registering client with: email=$email');
+      // Use email or generate a placeholder if not provided
+      final String finalEmail = (email != null && email.trim().isNotEmpty)
+          ? email.trim()
+          : "${username}@temp.user";  // Temporary email if only phone provided
+
+      // Use phone or empty string if not provided
+      final String finalPhone = (phoneNumber != null && phoneNumber.trim().isNotEmpty)
+          ? phoneNumber.trim()
+          : '';
+
+      debugPrint('Registering client with: email=$finalEmail, phone=$finalPhone');
 
       final response = await ApiService.registerClient(
         firstName: firstName,
         middleName: middleName,
         lastName: lastName,
         username: username,
-        email: email,
+        email: finalEmail,
         password: password,
-        phoneNumber: phoneNumber,
+        phoneNumber: finalPhone,
         avatarUrl: avatarUrl,
       );
 
@@ -206,9 +258,9 @@ class AuthController extends GetxController {
 
       // AUTO-LOGIN after registration with 'clients' role
       final loginSuccess = await login(
-        email: email,
+        email: finalEmail,
         password: password,
-        userRole: 'clients',  // ← Important: use 'clients' not 'client'
+        userRole: 'clients',
       );
 
       return loginSuccess;
@@ -227,44 +279,90 @@ class AuthController extends GetxController {
     }
   }
 
+  // ============================================================
+  // REGISTER ARTISAN - UPDATED to make email and phone optional (at least one required)
+  // ============================================================
   Future<bool> registerArtisan({
     required String firstName,
     String? middleName,
     required String lastName,
     required String username,
-    required String email,
+    String? email,  // Made nullable
+    String? phoneNumber,  // Made nullable
     required String password,
-    required String phoneNumber,
     required String category,
     required String province,
     required String city,
     required String district,
     String? avatarUrl,
-    String? diplomaUrl,  // ADD THIS
-    String? officialDocUrl, // ADD THIS
+    String? diplomaUrl,
+    String? officialDocUrl,
     String? diploma,
     int? experience,
   }) async {
     try {
+      // Validate that at least email OR phone is provided
+      if ((email == null || email.trim().isEmpty) &&
+          (phoneNumber == null || phoneNumber.trim().isEmpty)) {
+        Get.snackbar(
+          "Erreur",
+          "Veuillez fournir au moins un email ou un numéro de téléphone",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+
+      // Validate required documents
+      if (diplomaUrl == null || diplomaUrl.isEmpty) {
+        Get.snackbar(
+          "Erreur",
+          "Le diplôme/certification est requis",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+
+      if (officialDocUrl == null || officialDocUrl.isEmpty) {
+        Get.snackbar(
+          "Erreur",
+          "Le document officiel est requis",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+
       isLoading.value = true;
 
-      debugPrint('Registering artisan with: email=$email');
+      // Use email or generate a placeholder if not provided
+      final String finalEmail = (email != null && email.trim().isNotEmpty)
+          ? email.trim()
+          : "${username}@temp.user";  // Temporary email if only phone provided
+
+      // Use phone or empty string if not provided
+      final String finalPhone = (phoneNumber != null && phoneNumber.trim().isNotEmpty)
+          ? phoneNumber.trim()
+          : '';
+
+      debugPrint('Registering artisan with: email=$finalEmail, phone=$finalPhone');
 
       final response = await ApiService.registerArtisan(
         firstName: firstName,
         middleName: middleName,
         lastName: lastName,
         username: username,
-        email: email,
+        email: finalEmail,
         password: password,
-        phoneNumber: phoneNumber,
+        phoneNumber: finalPhone,
         category: category,
         province: province,
         city: city,
         district: district,
         avatarUrl: avatarUrl,
-        diplomaUrl: diplomaUrl,  // ADD THIS
-        officialDocUrl: officialDocUrl, // ADD THIS
+        diplomaUrl: diplomaUrl,
+        officialDocUrl: officialDocUrl,
         experience: experience,
       );
 
@@ -279,9 +377,9 @@ class AuthController extends GetxController {
 
       // AUTO-LOGIN after registration with 'artisans' role
       final loginSuccess = await login(
-        email: email,
+        email: finalEmail,
         password: password,
-        userRole: 'artisans',  // ← Important: use 'artisans' not 'artisan'
+        userRole: 'artisans',
       );
 
       return loginSuccess;
