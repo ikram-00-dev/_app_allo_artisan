@@ -1,33 +1,34 @@
-import 'artisan.dart';
-
 class PostModel {
   final int idPost;
   final String content;
-  final String approvalStatus;
-  final DateTime createdAt;
-  final String image;
+  final String? image;
   final int artisanId;
-  final Artisan? artisan;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final int? likesCount;
+  final int? commentsCount;
 
   PostModel({
     required this.idPost,
     required this.content,
-    required this.approvalStatus,
-    required this.createdAt,
-    required this.image,
+    this.image,
     required this.artisanId,
-    this.artisan,
+    required this.createdAt,
+    required this.updatedAt,
+    this.likesCount,
+    this.commentsCount,
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
     return PostModel(
-      idPost: json['IDPost'] ?? json['idPost'] ?? 0,
+      idPost: json['ID'] ?? json['id'] ?? json['idPost'] ?? 0,
       content: json['Content'] ?? json['content'] ?? '',
-      approvalStatus: json['ApprovalStatus'] ?? json['approvalStatus'] ?? 'pending',
+      image: json['Image'] ?? json['image'],
+      artisanId: json['ArtisanID'] ?? json['artisanId'] ?? json['artisan_id'] ?? 0,
       createdAt: DateTime.tryParse(json['CreatedAt'] ?? json['createdAt'] ?? '') ?? DateTime.now(),
-      image: json['Image'] ?? json['image'] ?? '',
-      artisanId: json['ArtisanID'] ?? json['artisanId'] ?? 0,
-      artisan: json['Artisan'] != null ? Artisan.fromJson(json['Artisan']) : null,
+      updatedAt: DateTime.tryParse(json['UpdatedAt'] ?? json['updatedAt'] ?? '') ?? DateTime.now(),
+      likesCount: json['LikesCount'] ?? json['likesCount'] ?? json['likes_count'] ?? 0,
+      commentsCount: json['CommentsCount'] ?? json['commentsCount'] ?? json['comments_count'] ?? 0,
     );
   }
 
@@ -35,25 +36,7 @@ class PostModel {
     return {
       'content': content,
       'image': image,
+      'artisanId': artisanId,
     };
-  }
-
-  bool get isApproved => approvalStatus == 'approved';
-  bool get isPending => approvalStatus == 'pending';
-
-  PostModel copyWith({
-    String? content,
-    String? approvalStatus,
-    String? image,
-  }) {
-    return PostModel(
-      idPost: idPost,
-      content: content ?? this.content,
-      approvalStatus: approvalStatus ?? this.approvalStatus,
-      createdAt: createdAt,
-      image: image ?? this.image,
-      artisanId: artisanId,
-      artisan: artisan,
-    );
   }
 }

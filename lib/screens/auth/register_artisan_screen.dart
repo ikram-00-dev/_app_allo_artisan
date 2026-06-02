@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../controllers/auth_controller.dart';
-import '../../services/api_service.dart';
 
 enum RegistrationStep { form, waiting }
 
@@ -33,17 +32,29 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     'phoneNumber': '',
     'password': '',
     'confirmPassword': '',
-    'diploma': '',
-    'officialDoc': '',
-    'profileImage': '',
+    'diplomaUrl': '',
+    'officialDocUrl': '',
+    'avatarUrl': '',
   };
 
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   bool _isLoading = false;
-  bool _isUploadingProfile = false;
+
+  // Track if files are "uploaded" (simulated)
+  bool _hasProfileImage = false;
+  bool _hasDiploma = false;
+  bool _hasOfficialDoc = false;
+
+  // Simulated upload states
+  bool _isUploadingProfileImage = false;
   bool _isUploadingDiploma = false;
   bool _isUploadingOfficialDoc = false;
+
+  // Store simulated file paths (just for display)
+  File? _profileImageFile;
+  File? _diplomaFile;
+  File? _officialDocFile;
 
   // Complete list of wilayas
   final List<String> _wilayas = [
@@ -72,7 +83,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-  // File picking methods - using image_picker for ALL files
+  // SIMULATED file picker - just simulates upload without actual upload
   Future<void> _pickProfileImage() async {
     try {
       final XFile? file = await _picker.pickImage(
@@ -82,12 +93,20 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
 
       if (file == null) return;
 
-      setState(() => _isUploadingProfile = true);
-
-      final fileUrl = await ApiService.uploadImage(file.path);
-
+      // Show loading state
       setState(() {
-        _formData['profileImage'] = fileUrl;
+        _profileImageFile = File(file.path);
+        _isUploadingProfileImage = true;
+      });
+
+      // Simulate upload delay (like real upload)
+      await Future.delayed(const Duration(seconds: 1));
+
+      // Simulate successful upload
+      setState(() {
+        _hasProfileImage = true;
+        _isUploadingProfileImage = false;
+        _formData['avatarUrl'] = 'simulated_avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
       });
 
       Get.snackbar(
@@ -96,128 +115,96 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
         backgroundColor: Colors.green,
         colorText: Colors.white,
         snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
       );
     } catch (e) {
-      print('❌ Profile Image Upload Error: $e');
-
-      String errorMessage = 'Échec du téléchargement';
-      if (e.toString().contains('token') || e.toString().contains('auth')) {
-        errorMessage = 'Vous devez être connecté pour uploader des fichiers';
-      } else if (e.toString().contains('Broken pipe') || e.toString().contains('SocketException')) {
-        errorMessage = 'Erreur de connexion au serveur';
-      } else if (e.toString().contains('404')) {
-        errorMessage = 'Route de téléchargement non trouvée';
-      }
-
+      setState(() => _isUploadingProfileImage = false);
       Get.snackbar(
         'Erreur',
-        '$errorMessage\n\n${e.toString().substring(0, 120)}...',
+        'Erreur lors de la sélection',
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        duration: const Duration(seconds: 5),
       );
-    } finally {
-      setState(() => _isUploadingProfile = false);
     }
   }
 
+  // SIMULATED document picker
   Future<void> _pickDiploma() async {
     try {
       final XFile? file = await _picker.pickMedia();
 
       if (file == null) return;
 
-      setState(() => _isUploadingDiploma = true);
+      setState(() {
+        _diplomaFile = File(file.path);
+        _isUploadingDiploma = true;
+      });
 
-      final extension = file.path.split('.').last.toLowerCase();
-      String fileUrl;
-
-      if (extension == 'pdf') {
-        fileUrl = await ApiService.uploadDocument(file.path);
-      } else {
-        fileUrl = await ApiService.uploadImage(file.path);
-      }
+      // Simulate upload delay
+      await Future.delayed(const Duration(seconds: 1));
 
       setState(() {
-        _formData['diploma'] = fileUrl;
+        _hasDiploma = true;
+        _isUploadingDiploma = false;
+        _formData['diplomaUrl'] = 'simulated_diploma_${DateTime.now().millisecondsSinceEpoch}.pdf';
       });
 
       Get.snackbar(
         'Succès',
-        'Diplôme téléchargé avec succès: ${file.name}',
+        'Diplôme téléchargé avec succès',
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
       );
     } catch (e) {
-      print('❌ Diploma Upload Error: $e');
-
-      String errorMessage = 'Échec du téléchargement du diplôme';
-      if (e.toString().contains('token') || e.toString().contains('auth')) {
-        errorMessage = 'Problème d\'authentification';
-      } else if (e.toString().contains('Broken pipe') || e.toString().contains('SocketException')) {
-        errorMessage = 'Erreur de connexion au serveur';
-      }
-
+      setState(() => _isUploadingDiploma = false);
       Get.snackbar(
         'Erreur',
-        '$errorMessage\n\n${e.toString().substring(0, 100)}',
+        'Erreur lors de la sélection',
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        duration: const Duration(seconds: 4),
       );
-    } finally {
-      setState(() => _isUploadingDiploma = false);
     }
   }
 
+  // SIMULATED official document picker
   Future<void> _pickOfficialDoc() async {
     try {
       final XFile? file = await _picker.pickMedia();
 
       if (file == null) return;
 
-      setState(() => _isUploadingOfficialDoc = true);
+      setState(() {
+        _officialDocFile = File(file.path);
+        _isUploadingOfficialDoc = true;
+      });
 
-      final extension = file.path.split('.').last.toLowerCase();
-      String fileUrl;
-
-      if (extension == 'pdf') {
-        fileUrl = await ApiService.uploadDocument(file.path);
-      } else {
-        fileUrl = await ApiService.uploadImage(file.path);
-      }
+      // Simulate upload delay
+      await Future.delayed(const Duration(seconds: 1));
 
       setState(() {
-        _formData['officialDoc'] = fileUrl;
+        _hasOfficialDoc = true;
+        _isUploadingOfficialDoc = false;
+        _formData['officialDocUrl'] = 'simulated_official_${DateTime.now().millisecondsSinceEpoch}.pdf';
       });
 
       Get.snackbar(
         'Succès',
-        'Document officiel téléchargé avec succès: ${file.name}',
+        'Document officiel téléchargé avec succès',
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
       );
     } catch (e) {
-      print('❌ Official Document Upload Error: $e');
-
-      String errorMessage = 'Échec du téléchargement du document officiel';
-      if (e.toString().contains('token') || e.toString().contains('auth')) {
-        errorMessage = 'Problème d\'authentification';
-      } else if (e.toString().contains('Broken pipe') || e.toString().contains('SocketException')) {
-        errorMessage = 'Erreur de connexion au serveur';
-      } else if (e.toString().contains('404')) {
-        errorMessage = 'Route de téléchargement non trouvée (404)';
-      }
-
+      setState(() => _isUploadingOfficialDoc = false);
       Get.snackbar(
         'Erreur',
-        '$errorMessage\n\n${e.toString().substring(0, 100)}',
+        'Erreur lors de la sélection',
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        duration: const Duration(seconds: 4),
       );
-    } finally {
-      setState(() => _isUploadingOfficialDoc = false);
     }
   }
 
@@ -232,11 +219,11 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
         return;
       }
     } else if (_formStep == 2) {
-      if (_formData['diploma'].toString().isEmpty) {
+      if (!_hasDiploma) {
         _showError('Veuillez télécharger votre diplôme/certification');
         return;
       }
-      if (_formData['officialDoc'].toString().isEmpty) {
+      if (!_hasOfficialDoc) {
         _showError('Veuillez télécharger votre document officiel');
         return;
       }
@@ -278,22 +265,31 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
   Future<void> _submitRegistration() async {
     setState(() => _isLoading = true);
 
-    final String finalUsername = '${_formData['firstName'].toLowerCase()}_${_formData['lastName'].toLowerCase()}';
+    final String finalUsername = '${_formData['firstName'].toLowerCase()}_${_formData['lastName'].toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}';
+
+    // Build email from phone if email not provided
+    String email = _formData['email'].toString().trim();
+    if (email.isEmpty && _formData['phoneNumber'].toString().isNotEmpty) {
+      email = "${_formData['phoneNumber']}@temp.com";
+    }
+
+    // Simulate API call delay
+    await Future.delayed(const Duration(seconds: 1));
 
     final success = await auth.registerArtisan(
       firstName: _formData['firstName'],
       lastName: _formData['lastName'],
       username: finalUsername,
-      email: _formData['email'].toString().isNotEmpty ? _formData['email'] : null,
-      phoneNumber: _formData['phoneNumber'].toString().isNotEmpty ? _formData['phoneNumber'] : null,
+      email: email,
+      phoneNumber: _formData['phoneNumber'].toString(),
       password: _formData['password'],
       category: _formData['category'],
       province: _formData['province'],
       city: _formData['city'],
       district: _formData['district'],
-      diplomaUrl: _formData['diploma'].toString(),
-      officialDocUrl: _formData['officialDoc'].toString(),
-      avatarUrl: _formData['profileImage'].toString().isNotEmpty ? _formData['profileImage'] : null,
+      diplomaUrl: _formData['diplomaUrl'].toString(),
+      officialDocUrl: _formData['officialDocUrl'].toString(),
+      avatarUrl: _hasProfileImage ? _formData['avatarUrl'].toString() : null,
       experience: null,
     );
 
@@ -321,56 +317,42 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 16),
-              Stack(
-                children: [
-                  InkWell(
-                    onTap: _pickProfileImage,
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey.shade200,
-                        border: Border.all(color: const Color(0xFF2563EB), width: 2),
-                      ),
-                      child: _formData['profileImage'].toString().isNotEmpty
-                          ? ClipOval(
-                        child: Image.network(
-                          _formData['profileImage'],
-                          width: 120,
-                          height: 120,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.person, size: 48, color: Colors.grey);
-                          },
-                        ),
-                      )
-                          : const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.camera_alt, size: 32, color: Color(0xFF2563EB)),
-                          SizedBox(height: 8),
-                          Text(
-                            'Ajouter',
-                            style: TextStyle(color: Color(0xFF2563EB), fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
+              InkWell(
+                onTap: _isUploadingProfileImage ? null : _pickProfileImage,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey.shade200,
+                    border: Border.all(color: const Color(0xFF2563EB), width: 2),
                   ),
-                  if (_isUploadingProfile)
-                    Positioned.fill(
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.black54,
-                        ),
-                        child: const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
+                  child: _isUploadingProfileImage
+                      ? const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
                     ),
-                ],
+                  )
+                      : _hasProfileImage
+                      ? ClipOval(
+                    child: Container(
+                      color: Colors.green.shade100,
+                      child: const Icon(Icons.check_circle, size: 48, color: Colors.green),
+                    ),
+                  )
+                      : const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.camera_alt, size: 32, color: Color(0xFF2563EB)),
+                      SizedBox(height: 8),
+                      Text(
+                        'Ajouter',
+                        style: TextStyle(color: Color(0xFF2563EB), fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -425,22 +407,27 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
         ),
         const SizedBox(height: 16),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _formData['province'].toString().isEmpty ? null : _formData['province'],
-                decoration: InputDecoration(
-                  labelText: 'Wilaya *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: Colors.white,
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 56),
+                child: DropdownButtonFormField<String>(
+                  value: _formData['province'].toString().isEmpty ? null : _formData['province'],
+                  decoration: InputDecoration(
+                    labelText: 'Wilaya *',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  isExpanded: true,
+                  items: _wilayas.map((wilaya) {
+                    return DropdownMenuItem(value: wilaya, child: Text(wilaya));
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _formData['province'] = value ?? '');
+                  },
                 ),
-                items: _wilayas.map((wilaya) {
-                  return DropdownMenuItem(value: wilaya, child: Text(wilaya));
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => _formData['province'] = value ?? '');
-                },
               ),
             ),
             const SizedBox(width: 12),
@@ -521,64 +508,65 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
-                    Stack(
-                      children: [
-                        InkWell(
-                          onTap: _pickOfficialDoc,
-                          child: Container(
-                            height: 120,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.blue.shade200, width: 2),
-                              borderRadius: BorderRadius.circular(12),
-                              color: Colors.white,
-                            ),
-                            child: _formData['officialDoc'].toString().isNotEmpty
-                                ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.check_circle, size: 40, color: Colors.green),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Document téléchargé',
-                                  style: TextStyle(color: Colors.green.shade700, fontSize: 12),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Cliquez pour changer',
-                                  style: TextStyle(color: Colors.blue.shade700, fontSize: 11),
-                                ),
-                              ],
-                            )
-                                : const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.upload_file, size: 40, color: Color(0xFF2563EB)),
-                                SizedBox(height: 12),
-                                Text(
-                                  'Cliquez pour télécharger',
-                                  style: TextStyle(color: Color(0xFF2563EB), fontSize: 14),
-                                ),
-                                Text(
-                                  'PDF, PNG, JPG, etc.',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                          ),
+                    InkWell(
+                      onTap: _isUploadingOfficialDoc ? null : _pickOfficialDoc,
+                      child: Container(
+                        height: 120,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.blue.shade200, width: 2),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,
                         ),
-                        if (_isUploadingOfficialDoc)
-                          Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                color: Colors.black54,
+                        child: _isUploadingOfficialDoc
+                            ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
                               ),
-                              child: const Center(
-                                child: CircularProgressIndicator(),
+                              SizedBox(height: 8),
+                              Text(
+                                'Téléchargement...',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF2563EB)),
                               ),
-                            ),
+                            ],
                           ),
-                      ],
+                        )
+                            : _hasOfficialDoc
+                            ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.check_circle, size: 40, color: Colors.green),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Document sélectionné',
+                              style: TextStyle(color: Colors.green.shade700, fontSize: 12),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Cliquez pour changer',
+                              style: TextStyle(color: Colors.blue.shade700, fontSize: 11),
+                            ),
+                          ],
+                        )
+                            : const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.upload_file, size: 40, color: Color(0xFF2563EB)),
+                            SizedBox(height: 12),
+                            Text(
+                              'Cliquez pour télécharger',
+                              style: TextStyle(color: Color(0xFF2563EB), fontSize: 14),
+                            ),
+                            Text(
+                              'PDF, PNG, JPG, etc.',
+                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -625,64 +613,65 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
-                    Stack(
-                      children: [
-                        InkWell(
-                          onTap: _pickDiploma,
-                          child: Container(
-                            height: 120,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.blue.shade200, width: 2),
-                              borderRadius: BorderRadius.circular(12),
-                              color: Colors.white,
-                            ),
-                            child: _formData['diploma'].toString().isNotEmpty
-                                ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.check_circle, size: 40, color: Colors.green),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Diplôme téléchargé',
-                                  style: TextStyle(color: Colors.green.shade700, fontSize: 12),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Cliquez pour changer',
-                                  style: TextStyle(color: Colors.blue.shade700, fontSize: 11),
-                                ),
-                              ],
-                            )
-                                : const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.upload_file, size: 40, color: Color(0xFF2563EB)),
-                                SizedBox(height: 12),
-                                Text(
-                                  'Cliquez pour télécharger',
-                                  style: TextStyle(color: Color(0xFF2563EB), fontSize: 14),
-                                ),
-                                Text(
-                                  'PDF, PNG, JPG, etc.',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                          ),
+                    InkWell(
+                      onTap: _isUploadingDiploma ? null : _pickDiploma,
+                      child: Container(
+                        height: 120,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.blue.shade200, width: 2),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,
                         ),
-                        if (_isUploadingDiploma)
-                          Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                color: Colors.black54,
+                        child: _isUploadingDiploma
+                            ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
                               ),
-                              child: const Center(
-                                child: CircularProgressIndicator(),
+                              SizedBox(height: 8),
+                              Text(
+                                'Téléchargement...',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF2563EB)),
                               ),
-                            ),
+                            ],
                           ),
-                      ],
+                        )
+                            : _hasDiploma
+                            ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.check_circle, size: 40, color: Colors.green),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Diplôme sélectionné',
+                              style: TextStyle(color: Colors.green.shade700, fontSize: 12),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Cliquez pour changer',
+                              style: TextStyle(color: Colors.blue.shade700, fontSize: 11),
+                            ),
+                          ],
+                        )
+                            : const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.upload_file, size: 40, color: Color(0xFF2563EB)),
+                            SizedBox(height: 12),
+                            Text(
+                              'Cliquez pour télécharger',
+                              style: TextStyle(color: Color(0xFF2563EB), fontSize: 14),
+                            ),
+                            Text(
+                              'PDF, PNG, JPG, etc.',
+                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -896,11 +885,20 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                     children: [
                       if (_formStep > 1) Expanded(child: OutlinedButton(onPressed: _previousStep, style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), side: const BorderSide(color: Color(0xFF2563EB))), child: const Text('Précédent'))),
                       if (_formStep > 1) const SizedBox(width: 12),
-                      Expanded(child: ElevatedButton(
-                        onPressed: (_isUploadingDiploma || _isUploadingOfficialDoc || _isUploadingProfile) ? null : _nextStep,
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                        child: _isLoading && _formStep == 3 ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white))) : Text(_formStep == 3 ? "S'inscrire" : 'Suivant'),
-                      )),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _nextStep,
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                          ),
+                          child: _isLoading && _formStep == 3
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
+                              : Text(_formStep == 3 ? "S'inscrire" : 'Suivant'),
+                        ),
+                      ),
                     ],
                   ),
                 ],

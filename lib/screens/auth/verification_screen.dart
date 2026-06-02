@@ -2,13 +2,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/auth_controller.dart';
+import 'waiting_screen.dart';
 
 class VerificationScreen extends StatefulWidget {
   final Map<String, dynamic> formData;
+  final bool isArtisan;
 
   const VerificationScreen({
     super.key,
     required this.formData,
+    this.isArtisan = false,
   });
 
   @override
@@ -32,7 +35,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
   void initState() {
     super.initState();
     _checkVerificationRequirements();
-    // Don't send codes automatically - just show a message
   }
 
   void _checkVerificationRequirements() {
@@ -50,20 +52,26 @@ class _VerificationScreenState extends State<VerificationScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Proceed with registration directly (skip verification for now)
-      final success = await authController.registerClient(
-        firstName: widget.formData['firstName'],
-        lastName: widget.formData['lastName'],
-        username: widget.formData['username'],
-        email: widget.formData['email'],
-        phoneNumber: widget.formData['phoneNumber'],
-        password: widget.formData['password'],
-        avatarUrl: widget.formData['avatarUrl'],
-      );
+      if (widget.isArtisan) {
+        // For artisan, the account is already created via the registration
+        // Just navigate to waiting screen
+        Get.off(() => const WaitingScreen(isArtisan: true));
+      } else {
+        // Proceed with client registration
+        final success = await authController.registerClient(
+          firstName: widget.formData['firstName'],
+          lastName: widget.formData['lastName'],
+          username: widget.formData['username'],
+          email: widget.formData['email'],
+          phoneNumber: widget.formData['phoneNumber'],
+          password: widget.formData['password'],
+          avatarUrl: widget.formData['avatarUrl'],
+        );
 
-      if (success) {
-        // Registration and auto-login successful
-        Get.offAllNamed('/client-home');
+        if (success) {
+          // Registration and auto-login successful
+          Get.offAllNamed('/client-home');
+        }
       }
     } catch (e) {
       debugPrint('Registration error: $e');
@@ -88,7 +96,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text('Confirmation'),
+        title: Text(widget.isArtisan ? 'Inscription Artisan' : 'Confirmation'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
@@ -110,19 +118,19 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.green.shade100,
+                      color: widget.isArtisan ? Colors.amber.shade100 : Colors.green.shade100,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.info_outline,
+                    child: Icon(
+                      widget.isArtisan ? Icons.assignment_turned_in : Icons.info_outline,
                       size: 48,
-                      color: Colors.green,
+                      color: widget.isArtisan ? Colors.amber : Colors.green,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'Vérification simplifiée',
-                    style: TextStyle(
+                  Text(
+                    widget.isArtisan ? 'Demande envoyée' : 'Vérification simplifiée',
+                    style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1E293B),
@@ -130,7 +138,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Votre compte va être créé avec:',
+                    widget.isArtisan
+                        ? 'Votre demande d\'inscription a été enregistrée avec succès.'
+                        : 'Votre compte va être créé avec:',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey.shade600,
@@ -165,43 +175,49 @@ class _VerificationScreenState extends State<VerificationScreen> {
                           title: const Text('Nom complet'),
                           subtitle: Text('${widget.formData['firstName']} ${widget.formData['lastName']}'),
                         ),
+                        if (widget.isArtisan)
+                          ListTile(
+                            leading: const Icon(Icons.work, color: Color(0xFF2563EB)),
+                            title: const Text('Rôle'),
+                            subtitle: const Text('Artisan'),
+                          ),
                       ],
                     ),
                   ),
 
                   const SizedBox(height: 24),
 
-                  // Info note
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info, color: Colors.blue.shade700, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Note: La vérification par code sera disponible prochainement. Pour l\'instant, votre compte sera créé immédiatement.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.blue.shade700,
+                  if (!widget.isArtisan)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info, color: Colors.blue.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Note: La vérification par code sera disponible prochainement. Pour l\'instant, votre compte sera créé immédiatement.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue.shade700,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 24),
+                  if (!widget.isArtisan) const SizedBox(height: 24),
 
-                  // Create account button
+                  // Create account button for client or Continue button for artisan
                   ElevatedButton(
                     onPressed: _isLoading ? null : _verifyAndRegister,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
+                      backgroundColor: widget.isArtisan ? Colors.amber : const Color(0xFF2563EB),
                       foregroundColor: Colors.white,
                       minimumSize: const Size(double.infinity, 52),
                       shape: RoundedRectangleBorder(
@@ -217,9 +233,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                        : const Text(
-                      'Créer mon compte',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        : Text(
+                      widget.isArtisan ? 'Continuer' : 'Créer mon compte',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-// Import your new screen
-import 'package:allo_artisan_gpt/screens/client/client_requests_screen.dart'; // ← Adjust path if needed
-
-import '/routes/app_routes.dart';
-import '/controllers/auth_controller.dart';
+// Import controllers and screens
+import 'package:allo_artisan_gpt/controllers/auth_controller.dart';
+import 'package:allo_artisan_gpt/controllers/notification_controller.dart';
+import 'package:allo_artisan_gpt/screens/client/client_requests_screen.dart';
+import 'package:allo_artisan_gpt/routes/app_routes.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -18,10 +18,11 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AuthController authController = Get.find<AuthController>();
+    final NotificationController notificationController = Get.find<NotificationController>();
 
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
+    return Obx(() => BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
+      currentIndex: currentIndex,
       selectedItemColor: const Color(0xFF2563EB),
       unselectedItemColor: Colors.grey,
       showUnselectedLabels: true,
@@ -42,7 +43,7 @@ class BottomNavBar extends StatelessWidget {
             if (authController.isArtisan) {
               Get.toNamed(AppRoutes.reservations);
             } else {
-              Get.toNamed(AppRoutes.clientRequests); // New client screen
+              Get.toNamed(AppRoutes.clientRequests);
             }
             break;
 
@@ -59,33 +60,101 @@ class BottomNavBar extends StatelessWidget {
             break;
         }
       },
-      items: const [  // ← This was missing or broken
-        BottomNavigationBarItem(
+      items: [
+        const BottomNavigationBarItem(
           icon: Icon(Icons.home_outlined),
           activeIcon: Icon(Icons.home),
           label: 'Accueil',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.calendar_today_outlined),
-          activeIcon: Icon(Icons.calendar_today),
-          label: 'Rendez-vous',
+          icon: authController.isArtisan
+              ? const Icon(Icons.calendar_today_outlined)
+              : const Icon(Icons.request_page_outlined),
+          activeIcon: authController.isArtisan
+              ? const Icon(Icons.calendar_today)
+              : const Icon(Icons.request_page),
+          label: authController.isArtisan ? 'Rendez-vous' : 'Demandes',
         ),
-        BottomNavigationBarItem(
+        const BottomNavigationBarItem(
           icon: Icon(Icons.message_outlined),
           activeIcon: Icon(Icons.message),
           label: 'Messages',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.notifications_outlined),
-          activeIcon: Icon(Icons.notifications),
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.notifications_outlined),
+              if (notificationController.unreadCount.value > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      notificationController.unreadCount.value > 99
+                          ? '99+'
+                          : '${notificationController.unreadCount.value}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          activeIcon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.notifications),
+              if (notificationController.unreadCount.value > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      notificationController.unreadCount.value > 99
+                          ? '99+'
+                          : '${notificationController.unreadCount.value}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           label: 'Notifications',
         ),
-        BottomNavigationBarItem(
+        const BottomNavigationBarItem(
           icon: Icon(Icons.person_outline),
           activeIcon: Icon(Icons.person),
           label: 'Profil',
         ),
       ],
-    );
+    ));
   }
 }

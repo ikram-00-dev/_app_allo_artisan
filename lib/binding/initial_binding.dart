@@ -9,6 +9,8 @@ import '../controllers/artisan_search_controller.dart';
 import '../controllers/settings_controller.dart';
 import '../controllers/user_controller.dart';
 import '../services/api_service.dart';
+import '../controllers/post_controller.dart'; // ADD THIS IMPORT
+
 
 class InitialBinding extends Bindings {
   @override
@@ -42,6 +44,8 @@ class InitialBinding extends Bindings {
 
     // Search Controller (no dependencies)
     Get.put<ArtisanSearchController>(ArtisanSearchController(), permanent: true);
+    // Post Controller (no dependencies) - ADD THIS
+    Get.put<PostController>(PostController(), permanent: true);
 
     // ============================================================
     // Controllers that REQUIRE ApiService parameter

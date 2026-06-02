@@ -1,132 +1,128 @@
+// screens/notifications_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../services/api_service.dart';
-import '../../models/notification.dart';
-import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
+import 'package:intl/intl.dart';
+import '../../controllers/notification_controller.dart';
+import '../../routes/app_routes.dart';
 
-class NotificationsScreen extends StatefulWidget {
+class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
   @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
-}
-
-class _NotificationsScreenState extends State<NotificationsScreen> {
-  List<NotificationModel> notifications = [];
-  bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    fetchNotifications();
-  }
-
-  Future<void> fetchNotifications() async {
-    try {
-      setState(() => isLoading = true);
-      final response = await ApiService.getNotifications();
-      setState(() {
-        notifications = (response as List).map((e) => NotificationModel.fromJson(e)).toList();
-      });
-    } catch (e) {
-      print('Error: $e');
-    } finally {
-      setState(() => isLoading = false);
-    }
-  }
-
-  Future<void> markAsRead(int id) async {
-    try {
-      await ApiService.markNotificationAsRead(id);
-      setState(() {
-        final index = notifications.indexWhere((n) => n.idNotif == id);
-        if (index != -1) {
-          notifications[index] = NotificationModel(
-            idNotif: notifications[index].idNotif,
-            content: notifications[index].content,
-            isRead: true,
-            createdAt: notifications[index].createdAt,
-            targetRole: notifications[index].targetRole,
-            clientId: notifications[index].clientId,
-            artisanId: notifications[index].artisanId,
-            adminId: notifications[index].adminId,
-            moderatorId: notifications[index].moderatorId,
-          );
-        }
-      });
-    } catch (e) {
-      print('Error marking as read: $e');
-    }
-  }
-
-  Future<void> markAllAsRead() async {
-    for (var notif in notifications.where((n) => !n.isRead)) {
-      await markAsRead(notif.idNotif);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final NotificationController controller = Get.find<NotificationController>();
+
     return Scaffold(
-      backgroundColor: const Color(0xffF5F5F5),
       appBar: AppBar(
-        title: const Text("Notifications"),
+        title: const Text('Notifications'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
         actions: [
-          if (notifications.any((n) => !n.isRead))
-            TextButton(
-              onPressed: markAllAsRead,
-              child: const Text("Tout lire", style: TextStyle(color: Colors.blue)),
-            ),
+          Obx(() {
+            if (controller.unreadCount.value > 0) {
+              return IconButton(
+                icon: const Icon(Icons.done_all),
+                onPressed: () => controller.markAllAsRead(),
+                tooltip: 'Tout marquer comme lu',
+              );
+            }
+            return const SizedBox.shrink();
+          }),
         ],
       ),
-      bottomNavigationBar: const BottomNavBar(currentIndex: 3),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : notifications.isEmpty
-          ? const Center(child: Text("Aucune notification"))
-          : ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: notifications.length,
-        itemBuilder: (context, index) {
-          final notif = notifications[index];
-          return GestureDetector(
-            onTap: () => markAsRead(notif.idNotif),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: notif.isRead ? Colors.white : const Color(0xffEAF3FF),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: notif.isRead ? Colors.grey.shade200 : Colors.blue.shade200,
+      backgroundColor: Colors.grey.shade50,
+      body: Obx(() {
+        if (controller.isLoading.value && controller.notifications.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (controller.notifications.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.notifications_none, size: 64, color: Colors.grey.shade400),
+                const SizedBox(height: 16),
+                Text(
+                  'Aucune notification',
+                  style: TextStyle(color: Colors.grey.shade600),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    notif.content,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: notif.isRead ? Colors.black87 : Colors.black,
-                    ),
+                const SizedBox(height: 8),
+                Text(
+                  'Les notifications apparaîtront ici',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: controller.notifications.length,
+          itemBuilder: (context, index) {
+            final notification = controller.notifications[index];
+            final isUnread = !notification.isRead;
+
+            return GestureDetector(
+              onTap: () => controller.handleNotificationTap(notification),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: isUnread ? Colors.blue.shade50 : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isUnread ? Colors.blue : Colors.grey.shade200,
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.access_time, size: 14, color: Colors.grey),
-                      const SizedBox(width: 5),
-                      Text(
-                        notif.formattedTime,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _getNotificationIcon(notification.content),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _getNotificationTitle(notification.content),
+                                  style: TextStyle(
+                                    fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _getNotificationBody(notification.content),
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  notification.formattedTime,
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const Spacer(),
-                      if (!notif.isRead)
-                        Container(
+                    ),
+                    if (isUnread)
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: Container(
                           width: 8,
                           height: 8,
                           decoration: const BoxDecoration(
@@ -134,14 +130,56 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             shape: BoxShape.circle,
                           ),
                         ),
-                    ],
-                  ),
-                ],
+                      ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        );
+      }),
     );
+  }
+
+  Widget _getNotificationIcon(String content) {
+    IconData icon;
+    Color color;
+
+    if (content.contains('urgente') || content.contains('urgent')) {
+      icon = Icons.warning_amber_rounded;
+      color = Colors.red;
+    } else if (content.contains('accepté')) {
+      icon = Icons.check_circle;
+      color = Colors.green;
+    } else if (content.contains('message')) {
+      icon = Icons.message;
+      color = Colors.blue;
+    } else {
+      icon = Icons.notifications;
+      color = Colors.orange;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, color: color, size: 22),
+    );
+  }
+
+  String _getNotificationTitle(String content) {
+    if (content.contains('urgente')) return '🚨 Demande urgente';
+    if (content.contains('accepté')) return '✅ Demande acceptée';
+    if (content.contains('message')) return '💬 Nouveau message';
+    return 'Notification';
+  }
+
+  String _getNotificationBody(String content) {
+    if (content.contains(':')) {
+      return content.split(':').last.trim();
+    }
+    return content;
   }
 }

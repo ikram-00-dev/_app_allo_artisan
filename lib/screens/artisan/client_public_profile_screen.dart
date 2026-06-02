@@ -23,6 +23,19 @@ class ClientPublicProfileScreen extends StatefulWidget {
 class _ClientPublicProfileScreenState extends State<ClientPublicProfileScreen> {
   bool showFollowing = false;
   bool isSendingMessage = false;
+  String _getInitials(String name) {
+    if (name.trim().isEmpty) return "?";
+
+    final parts = name.trim().split(" ");
+
+    if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
+
+    return (
+        parts[0][0] + parts[1][0]
+    ).toUpperCase();
+  }
 
   // =========================================================
   // MOCK FOLLOWING LIST
@@ -57,6 +70,7 @@ class _ClientPublicProfileScreenState extends State<ClientPublicProfileScreen> {
       rating: 4.8,
       reviewCount: 120,
       followers: null,
+      officialDoc: '',
     ),
     Artisan(
       user: User(
@@ -87,6 +101,7 @@ class _ClientPublicProfileScreenState extends State<ClientPublicProfileScreen> {
       rating: 4.5,
       reviewCount: 85,
       followers: null,
+      officialDoc: '',
     ),
   ];
 
@@ -136,8 +151,7 @@ class _ClientPublicProfileScreenState extends State<ClientPublicProfileScreen> {
         child: Column(
           children: [
             _buildProfileHeader(widget.client),
-            const SizedBox(height: 16),
-            _buildFollowingSection(),
+
           ],
         ),
       ),
@@ -162,15 +176,16 @@ class _ClientPublicProfileScreenState extends State<ClientPublicProfileScreen> {
               CircleAvatar(
                 radius: 40,
                 backgroundColor: Colors.blue.shade100,
-                backgroundImage: NetworkImage(
-                  client.avatarUrl.isNotEmpty
-                      ? client.avatarUrl
-                      : "https://i.pravatar.cc/300?img=${client.id}",
-                ),
+                backgroundImage:
+                client.avatarUrl.isNotEmpty ? NetworkImage(client.avatarUrl) : null,
                 child: client.avatarUrl.isEmpty
                     ? Text(
-                  client.name.isNotEmpty ? client.name[0].toUpperCase() : "C",
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  _getInitials(client.name),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
                 )
                     : null,
               ),
@@ -432,15 +447,17 @@ class _ClientPublicProfileScreenState extends State<ClientPublicProfileScreen> {
                     children: [
                       CircleAvatar(
                         radius: 24,
-                        backgroundImage: NetworkImage(
-                          artisan.avatarUrl.isNotEmpty
-                              ? artisan.avatarUrl
-                              : "https://i.pravatar.cc/150?img=${artisan.id}",
-                        ),
+                        backgroundColor: Colors.orange.shade100,
+                        backgroundImage:
+                        artisan.avatarUrl.isNotEmpty ? NetworkImage(artisan.avatarUrl) : null,
                         child: artisan.avatarUrl.isEmpty
                             ? Text(
-                          artisan.fullName.isNotEmpty ? artisan.fullName[0].toUpperCase() : "A",
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          _getInitials(artisan.fullName),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
                         )
                             : null,
                       ),

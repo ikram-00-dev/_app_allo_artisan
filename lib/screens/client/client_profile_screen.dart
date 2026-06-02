@@ -26,7 +26,19 @@ class ClientProfileScreen extends StatefulWidget {
 
 class _ClientProfileScreenState extends State<ClientProfileScreen> {
   bool showFollowing = false;
+  String _getInitials(String name) {
+    if (name.trim().isEmpty) return "?";
 
+    final parts = name.trim().split(" ");
+
+    if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
+
+    return (
+        parts[0][0] + parts[1][0]
+    ).toUpperCase();
+  }
   // =========================================================
   // MOCK FOLLOWING LIST - Updated to match new Artisan model
   // =========================================================
@@ -60,6 +72,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
       rating: 4.8,
       reviewCount: 120,
       followers: null,
+      officialDoc: '',
     ),
     Artisan(
       user: User(
@@ -90,6 +103,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
       rating: 4.5,
       reviewCount: 85,
       followers: null,
+      officialDoc: '',
     ),
   ];
 

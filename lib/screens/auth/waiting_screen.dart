@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class WaitingScreen extends StatelessWidget {
-  final Map<String, dynamic>? formData;
+  final bool isArtisan;
 
-  const WaitingScreen({super.key, this.formData});
+  const WaitingScreen({super.key, this.isArtisan = true});
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +36,7 @@ class WaitingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    'En attente de validation',
+                    'Demande envoyée',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -46,7 +46,9 @@ class WaitingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Votre demande d\'inscription a été enregistrée avec succès.',
+                    isArtisan
+                        ? 'Votre demande d\'inscription artisan a été enregistrée avec succès.'
+                        : 'Votre demande d\'inscription a été enregistrée avec succès.',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -77,19 +79,19 @@ class WaitingScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         _buildStepItem(
                           icon: Icons.check_circle,
-                          text: 'Nos équipes vont vérifier vos documents sous 24 à 48 heures',
+                          text: 'L\'administrateur va étudier vos informations et documents',
                           color: Colors.blue.shade700,
                         ),
                         const SizedBox(height: 8),
                         _buildStepItem(
                           icon: Icons.check_circle,
-                          text: 'Vous recevrez un email de confirmation une fois votre compte approuvé',
+                          text: 'Vérifiez votre email, nous vous informerons quand le compte sera accepté',
                           color: Colors.blue.shade700,
                         ),
                         const SizedBox(height: 8),
                         _buildStepItem(
                           icon: Icons.check_circle,
-                          text: 'Vous pourrez alors accéder à toutes les fonctionnalités de la plateforme',
+                          text: 'Une fois approuvé, vous pourrez vous connecter avec votre email et mot de passe',
                           color: Colors.blue.shade700,
                         ),
                       ],
@@ -126,7 +128,7 @@ class WaitingScreen extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // Return to login button
+                  // OK button to return to login
                   ElevatedButton(
                     onPressed: () => Get.offAllNamed('/login'),
                     style: ElevatedButton.styleFrom(
@@ -138,7 +140,7 @@ class WaitingScreen extends StatelessWidget {
                       ),
                     ),
                     child: const Text(
-                      'Retour à la connexion',
+                      'OK',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                   ),

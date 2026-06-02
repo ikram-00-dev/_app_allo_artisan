@@ -8,7 +8,7 @@ import 'package:allo_artisan_gpt/services/api_service.dart';
 import 'package:allo_artisan_gpt/routes/app_routes.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-
+import 'package:allo_artisan_gpt/controllers/switch_account_controller.dart';
 // ============================================================
 // TYPES
 // ============================================================
@@ -1008,18 +1008,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ============================================================
 // BOTTOM ACTIONS
 // ============================================================
+  // ============================================================
+// BOTTOM ACTIONS - UPDATED with dynamic switch account
+// ============================================================
   Widget _buildBottomActions(bool canSwitchRole) {
-    return Column(
-      children: [
-        if (canSwitchRole)
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE5E5E5)),
-            ),
-            child: GestureDetector(
-              onTap: () => _switchRole(authController.isArtisan ? 'client' : 'artisan'),
+    // Initialize the switch controller (GetX will manage it)
+    final SwitchAccountController switchController = Get.put(SwitchAccountController());
+
+    return Obx(() {
+      // Show loading state while checking artisan account
+      if (switchController.checkingAccount.value && authController.isClient) {
+        return Column(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE5E5E5)),
+              ),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Row(
@@ -1032,7 +1038,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Center(
-                        child: Icon(Icons.swap_horiz, size: 22, color: Color(0xFF2563EB)),
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -1040,9 +1050,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Basculer en ${authController.isArtisan ? "Client" : "Artisan"}",
-                            style: const TextStyle(
+                          const Text(
+                            "Vérification en cours...",
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF171717),
@@ -1050,7 +1060,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "Mode actuel: ${authController.isArtisan ? "Artisan" : "Client"}",
+                            "Vérification de votre compte artisan",
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF9CA3AF),
@@ -1059,31 +1069,230 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right, size: 20, color: Color(0xFF9CA3AF)),
                   ],
                 ),
               ),
             ),
-          ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout, size: 20),
-            label: const Text("Se déconnecter"),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFDC2626),
-              side: const BorderSide(color: Color(0xFFFEE2E2)),
-              backgroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _logout,
+                icon: const Icon(Icons.logout, size: 20),
+                label: const Text("Se déconnecter"),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFDC2626),
+                  side: const BorderSide(color: Color(0xFFFEE2E2)),
+                  backgroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+
+      return Column(
+        children: [
+          if (canSwitchRole)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE5E5E5)),
+              ),
+              child: InkWell(
+                onTap: switchController.isLoading.value ? null : () => _switchAccountWithLogic(switchController),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: switchController.isLoading.value
+                            ? const Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                            : const Center(
+                          child: Icon(Icons.swap_horiz, size: 22, color: Color(0xFF2563EB)),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              switchController.isLoading.value
+                                  ? "Changement en cours..."
+                                  : "Basculer en ${authController.isArtisan ? "Client" : "Artisan"}",
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF171717),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              authController.isArtisan
+                                  ? "Mode actuel: Artisan"
+                                  : (switchController.hasArtisanAccount.value
+                                  ? "Mode actuel: Client (Compte Artisan trouvé)"
+                                  : "Mode actuel: Client (Créez un compte Artisan)"),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: authController.isArtisan
+                                    ? const Color(0xFF9CA3AF)
+                                    : (switchController.hasArtisanAccount.value
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFFD97706)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        switchController.isLoading.value ? Icons.hourglass_empty : Icons.chevron_right,
+                        size: 20,
+                        color: const Color(0xFF9CA3AF),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _logout,
+              icon: const Icon(Icons.logout, size: 20),
+              label: const Text("Se déconnecter"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFDC2626),
+                side: const BorderSide(color: Color(0xFFFEE2E2)),
+                backgroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
           ),
+        ],
+      );
+    });
+  }
+
+// Add this new method to handle the switch logic
+  Future<void> _switchAccountWithLogic(SwitchAccountController switchController) async {
+    if (authController.isClient) {
+      // Client wants to switch to artisan
+      if (switchController.hasArtisanAccount.value) {
+        // Direct switch - artisan account exists
+        await authController.switchRole('artisan');
+        Get.snackbar(
+          "Mode changé",
+          "Vous êtes maintenant en mode Artisan",
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      } else {
+        // Show dialog to create artisan account (preserve your design)
+        _showCreateArtisanAccountDialog();
+      }
+    } else if (authController.isArtisan) {
+      // Artisan wants to switch to client - direct switch allowed
+      await authController.switchRole('client');
+      Get.snackbar(
+        "Mode changé",
+        "Vous êtes maintenant en mode Client",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+    }
+  }
+
+// Add dialog method with your app's design language
+  void _showCreateArtisanAccountDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Icon(Icons.construction, color: Color(0xFF2563EB), size: 20),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              "Devenir Artisan",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
-      ],
+        content: const Text(
+          "Vous n'avez pas encore de compte artisan. "
+              "Souhaitez-vous créer un compte artisan maintenant pour "
+              "pouvoir basculer entre les deux modes ?",
+          style: TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF6B7280),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Navigate to artisan registration
+              Get.toNamed('/artisan-register', arguments: {
+                'fromSwitch': true,
+                'clientEmail': authController.user.value?['email'],
+                'clientPhone': authController.user.value?['phoneNumber'],
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text("Créer un compte"),
+          ),
+        ],
+      ),
     );
   }
 

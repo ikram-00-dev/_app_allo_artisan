@@ -6,6 +6,10 @@ import '../../routes/app_routes.dart';
 import '../client/artisan_profile_screen.dart';
 import 'package:allo_artisan_gpt/screens/client/client_requests_screen.dart';
 import 'package:allo_artisan_gpt/core/widgets/restricted_access_card.dart'; // Add this import
+import '../../controllers/request_controller.dart';
+import 'package:allo_artisan_gpt/controllers/post_controller.dart';
+import 'package:allo_artisan_gpt/models/post.dart';
+
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -16,12 +20,18 @@ class ClientHomeScreen extends StatefulWidget {
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
   final AuthController authController = Get.find<AuthController>();
+  final PostController postController = Get.put(PostController());
+
   bool isUrgent = false;
   bool _showLoginModal = false;
   bool _showRequestModal = false;
   String _selectedCategory = 'Plomberie';
   String _requestZone = '';
   String _requestDescription = '';
+  final RequestController requestController = Get.put(RequestController());
+  bool _isSubmitting = false;
+
+
 
   final Set<String> likedPosts = {};
 
@@ -121,36 +131,64 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     _showRestrictedCard();
   }
 
-  void handleSubmitRequest() {
-    if (!authController.isLoggedIn) {
-      _showRestrictedCard();
+  // Replace the existing _handleSubmitRequest method with this:
+  // Replace the _handleSubmitRequest method in client_home_screen.dart
+  void _handleSubmitRequest() async {
+    // Validation
+    if (_selectedCategory.isEmpty) {
+      Get.snackbar('Erreur', 'Veuillez choisir une catégorie',
+          backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
 
-    if (_selectedCategory.isEmpty || _requestDescription.isEmpty) {
-      Get.snackbar(
-        'Erreur',
-        'Veuillez remplir tous les champs obligatoires',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+    if (_requestDescription.trim().isEmpty) {
+      Get.snackbar('Erreur', 'Veuillez entrer une description',
+          backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
 
-    Get.snackbar(
-      'Succès',
-      'Demande ${isUrgent ? "urgente" : "normale"} envoyée avec succès!',
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
+    if (isUrgent && _requestZone.isEmpty) {
+      Get.snackbar('Erreur', 'La zone est obligatoire pour une demande urgente',
+          backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+
+    // Get current user ID
+    final user = authController.user.value;
+    final clientId = user?['id'] ?? user?['clientId'] ?? user?['ID'];
+
+    // Use real location (you can add Geolocator later)
+    double latitude = 33.5731;
+    double longitude = -7.5898;
+
+    setState(() => _isSubmitting = true);
+
+    // Submit using RequestController
+    final success = await requestController.createRequest(
+      description: _requestDescription,
+      category: _selectedCategory,
+      latitude: latitude,
+      longitude: longitude,
+      isUrgent: isUrgent,
+      zoneKm: isUrgent ? int.tryParse(_requestZone) : null,
+      clientId: clientId,
     );
 
-    setState(() {
-      _showRequestModal = false;
-      _requestZone = '';
-      _requestDescription = '';
-      _selectedCategory = 'Plomberie';
-      isUrgent = false;
-    });
+    setState(() => _isSubmitting = false);
+
+    if (success) {
+      // Reset form and close modal
+      setState(() {
+        _showRequestModal = false;
+        _requestZone = '';
+        _requestDescription = '';
+        _selectedCategory = 'Plomberie';
+        isUrgent = false;
+      });
+
+      // Navigate directly to requests screen after successful submission
+      Get.offAllNamed(AppRoutes.clientRequests);
+    }
   }
 
   void onNavBarTapped(int index) {
@@ -253,8 +291,32 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   const Text('Publications récentes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
 
-                  // Static Posts with initial avatar
-                  ...publications.map((post) => _buildPostCard(post)),
+// Dynamic Posts from API
+                  Obx(() {
+                    if (postController.isLoading.value && postController.posts.isEmpty) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (postController.posts.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Aucune publication pour le moment',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      children: postController.posts.map((post) => _buildDynamicPostCard(post)).toList(),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -305,6 +367,145 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         ],
       ),
     );
+  }
+  Widget _buildDynamicPostCard(PostModel post) {
+    final isLiked = likedPosts.contains(post.idPost.toString());
+    final likeCount = (post.likesCount ?? 0) + (isLiked ? 1 : 0);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header (Avatar + Name)
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: GestureDetector(
+              onTap: () => Get.toNamed(AppRoutes.artisanProfile, arguments: post.artisanId),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: _getAvatarColor('Artisan ${post.artisanId}'),
+                    child: Text(
+                      _getArtisanInitials(post.artisanId),
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Artisan #${post.artisanId}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatPostDate(post.createdAt),
+                          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Image if exists
+          if (post.image != null && post.image!.isNotEmpty)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(0), bottom: Radius.circular(0)),
+              child: Image.network(
+                post.image!,
+                width: double.infinity,
+                height: 250,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(height: 250, color: Colors.grey[300], child: const Icon(Icons.broken_image, size: 50));
+                },
+              ),
+            ),
+
+          // Description
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Text(post.content),
+          ),
+
+          // Actions
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => _handleLikePost(post.idPost),
+                  child: Row(
+                    children: [
+                      Icon(isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: isLiked ? Colors.red : Colors.grey, size: 22),
+                      const SizedBox(width: 6),
+                      Text(likeCount.toString(), style: const TextStyle(fontSize: 14)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 24),
+                GestureDetector(
+                  onTap: () => Get.toNamed(AppRoutes.artisanProfile, arguments: post.artisanId),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.comment_outlined, size: 22, color: Colors.grey),
+                      const SizedBox(width: 6),
+                      Text("${post.commentsCount ?? 0}", style: const TextStyle(fontSize: 14)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 24),
+                const Icon(Icons.share_outlined, size: 22, color: Colors.grey),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  String _getArtisanInitials(int artisanId) {
+    return 'A${artisanId % 100}';
+  }
+
+  String _formatPostDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inMinutes < 1) return 'À l\'instant';
+    if (diff.inMinutes < 60) return 'Il y a ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'Il y a ${diff.inHours} h';
+    if (diff.inDays < 7) return 'Il y a ${diff.inDays} j';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  void _handleLikePost(int postId) {
+    if (!authController.isLoggedIn) {
+      _showRestrictedCard();
+      return;
+    }
+    setState(() {
+      if (likedPosts.contains(postId.toString())) {
+        likedPosts.remove(postId.toString());
+      } else {
+        likedPosts.add(postId.toString());
+      }
+    });
+    postController.toggleLike(postId);
   }
 
   // ============================================================
@@ -536,6 +737,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         Expanded(
                           child: _buildTypeButton(
                             label: 'Normale',
+
                             icon: Icons.edit_note_outlined,
                             isSelected: !isUrgent,
                             onTap: () => setState(() => isUrgent = false),
@@ -676,15 +878,26 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
+                        // Update the submit button in _buildRequestModal to show loading state
+// Find the ElevatedButton for submission and replace with:
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: _handleSubmitRequest,
+                            onPressed: _isSubmitting ? null : _handleSubmitRequest,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isUrgent ? Colors.red : const Color(0xFF2563EB),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: const Text('Envoyer la demande', style: TextStyle(color: Colors.white)),
+                            child: _isSubmitting
+                                ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                                : const Text('Envoyer la demande', style: TextStyle(color: Colors.white)),
                           ),
                         ),
                       ],
@@ -699,40 +912,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  void _handleSubmitRequest() {
-    // Validation
-    if (_selectedCategory.isEmpty) {
-      Get.snackbar('Erreur', 'Veuillez choisir une catégorie', backgroundColor: Colors.red, colorText: Colors.white);
-      return;
-    }
-
-    if (_requestDescription.trim().isEmpty) {
-      Get.snackbar('Erreur', 'Veuillez entrer une description', backgroundColor: Colors.red, colorText: Colors.white);
-      return;
-    }
-
-    if (isUrgent && _requestZone.isEmpty) {
-      Get.snackbar('Erreur', 'La zone est obligatoire pour une demande urgente', backgroundColor: Colors.red, colorText: Colors.white);
-      return;
-    }
-
-    // Success
-    Get.snackbar(
-      'Succès',
-      'Demande ${isUrgent ? "urgente" : "normale"} envoyée avec succès!',
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-    );
-
-    // Reset form
-    setState(() {
-      _showRequestModal = false;
-      _requestZone = '';
-      _requestDescription = '';
-      _selectedCategory = 'Plomberie';
-      isUrgent = false;
-    });
-  }
 
   Widget _buildTypeButton({
     required String label,

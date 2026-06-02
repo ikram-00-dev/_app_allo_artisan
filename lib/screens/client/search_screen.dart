@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../controllers/artisan_controller.dart';
 import '../../models/artisan.dart';
 import '../../routes/app_routes.dart';
+import 'dart:async';
 
 class SearchScreen extends StatefulWidget {
   final String? initialCategory;
@@ -17,13 +18,15 @@ class _SearchScreenState extends State<SearchScreen> {
   final ArtisanController controller = Get.find<ArtisanController>();
   final TextEditingController searchController = TextEditingController();
 
-  bool _showFilters = true;
-  String _selectedCategory = 'all';
-  double _selectedDistance = 10.0;
-  double _selectedRating = 0.0;
+  // Reactive variables using GetX
+  final RxBool _showFilters = true.obs;
+  final RxString _selectedCategory = 'all'.obs;
+  final RxDouble _selectedDistance = 10.0.obs;
+  final RxDouble _selectedRating = 0.0.obs;
+  final RxBool _isCategoryExpanded = false.obs;
 
-  // Control ExpansionTile manually
-  bool _isCategoryExpanded = false;
+  // For debouncing search
+  Timer? _debounceTimer;
 
   final List<Map<String, String>> _categories = [
     {'id': 'all', 'name': 'Toutes catégories', 'icon': '🔍'},
@@ -39,40 +42,58 @@ class _SearchScreenState extends State<SearchScreen> {
     {'id': 'soudure', 'name': 'Soudure', 'icon': '🔥'},
   ];
 
+  // Computed observable for filtered artisans
+  RxList<Artisan> get _filteredArtisans => RxList<Artisan>(
+      controller.allArtisans.where((artisan) {
+        // Filter ONLY active artisans (activesStatus == 'active')
+        if (artisan.activesStatus != 'active') {
+          return false;
+        }
+
+        if (_selectedCategory.value != 'all' &&
+            artisan.category.toLowerCase() != _selectedCategory.value.toLowerCase()) {
+          return false;
+        }
+
+        if (_selectedRating.value > 0 && (artisan.rating ?? 0) < _selectedRating.value) {
+          return false;
+        }
+
+        final query = searchController.text.trim().toLowerCase();
+        if (query.isNotEmpty) {
+          return artisan.fullName.toLowerCase().contains(query) ||
+              artisan.category.toLowerCase().contains(query);
+        }
+        return true;
+      }).toList()
+  );
+
   @override
   void initState() {
     super.initState();
     if (widget.initialCategory != null) {
-      _selectedCategory = widget.initialCategory!.toLowerCase();
+      _selectedCategory.value = widget.initialCategory!.toLowerCase();
     }
+
+    // Load artisans when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.loadAllArtisans();
     });
+
+    // Add listener to search controller for debouncing
+    searchController.addListener(_onSearchChanged);
   }
 
-  List<Artisan> get _filteredArtisans {
-    var result = controller.allArtisans.where((artisan) {
-      if (_selectedCategory != 'all' &&
-          artisan.category.toLowerCase() != _selectedCategory.toLowerCase()) {
-        return false;
-      }
-      if (_selectedRating > 0 && (artisan.rating ?? 0) < _selectedRating) {
-        return false;
-      }
-      final query = searchController.text.trim().toLowerCase();
-      if (query.isNotEmpty) {
-        return artisan.fullName.toLowerCase().contains(query) ||
-            artisan.category.toLowerCase().contains(query);
-      }
-      return true;
-    }).toList();
-
-    result.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
-    return result;
+  void _onSearchChanged() {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _applyFilters();
+    });
   }
 
   void _applyFilters() {
-    setState(() {});
+    // Trigger rebuild by updating the filtered list
+    _filteredArtisans.refresh();
   }
 
   void _navigateToArtisanProfile(Artisan artisan) {
@@ -80,21 +101,17 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _selectCategory(String value) {
-    setState(() {
-      _selectedCategory = value;
-      // Close the expansion tile after selection
-      _isCategoryExpanded = false;
-    });
+    _selectedCategory.value = value;
+    _isCategoryExpanded.value = false;
     _applyFilters();
   }
 
   void _resetFilters() {
-    setState(() {
-      _selectedCategory = 'all';
-      _selectedDistance = 10.0;
-      _selectedRating = 0.0;
-      searchController.clear();
-    });
+    _selectedCategory.value = 'all';
+    _selectedDistance.value = 10.0;
+    _selectedRating.value = 0.0;
+    searchController.clear();
+    _applyFilters();
   }
 
   @override
@@ -102,7 +119,7 @@ class _SearchScreenState extends State<SearchScreen> {
     // Get the selected category name for display
     String selectedCategoryName = 'Toutes catégories';
     for (var cat in _categories) {
-      if (cat['id'] == _selectedCategory) {
+      if (cat['id'] == _selectedCategory.value) {
         selectedCategoryName = cat['name']!;
         break;
       }
@@ -135,46 +152,64 @@ class _SearchScreenState extends State<SearchScreen> {
           onPressed: () => Get.back(),
         ),
         actions: [
-          IconButton(
-            icon: Icon(_showFilters ? Icons.filter_list : Icons.filter_list_off),
-            onPressed: () => setState(() => _showFilters = !_showFilters),
-          ),
+          Obx(() => IconButton(
+            icon: Icon(_showFilters.value ? Icons.filter_list : Icons.filter_list_off),
+            onPressed: () => _showFilters.value = !_showFilters.value,
+          )),
         ],
       ),
-      body: Column(
-        children: [
-          if (_showFilters) _buildFilters(selectedCategoryName),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${_filteredArtisans.length} artisan(s) trouvé(s)',
-                  style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.grey),
-                ),
-                if (_selectedCategory != 'all' || _selectedRating > 0 || searchController.text.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: _resetFilters,
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('Réinitialiser'),
-                  ),
-              ],
+      body: Obx(() {
+        // Show loading state
+        if (controller.isLoading.value && controller.allArtisans.isEmpty) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF2563EB)),
+          );
+        }
+
+        return Column(
+          children: [
+            if (_showFilters.value) _buildFilters(selectedCategoryName),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Obx(() => Text(
+                    '${_filteredArtisans.length} artisan(s) trouvé(s)',
+                    style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.grey),
+                  )),
+                  Obx(() {
+                    if (_selectedCategory.value != 'all' ||
+                        _selectedRating.value > 0 ||
+                        searchController.text.isNotEmpty) {
+                      return TextButton.icon(
+                        onPressed: _resetFilters,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Réinitialiser'),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  }),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: _filteredArtisans.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _filteredArtisans.length,
-              itemBuilder: (context, index) {
-                return _buildArtisanCard(_filteredArtisans[index]);
-              },
+            Expanded(
+              child: Obx(() {
+                if (_filteredArtisans.isEmpty) {
+                  return _buildEmptyState();
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _filteredArtisans.length,
+                  itemBuilder: (context, index) {
+                    return _buildArtisanCard(_filteredArtisans[index]);
+                  },
+                );
+              }),
             ),
-          ),
-        ],
-      ),
+          ],
+        );
+      }),
     );
   }
 
@@ -189,7 +224,7 @@ class _SearchScreenState extends State<SearchScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Category ExpansionTile (Collapsible List)
-          ExpansionTile(
+          Obx(() => ExpansionTile(
             title: const Text(
               'Catégorie',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -199,11 +234,9 @@ class _SearchScreenState extends State<SearchScreen> {
               style: const TextStyle(color: Color(0xFF2563EB), fontSize: 13),
             ),
             leading: const Icon(Icons.category, color: Color(0xFF2563EB)),
-            initiallyExpanded: _isCategoryExpanded,
+            initiallyExpanded: _isCategoryExpanded.value,
             onExpansionChanged: (expanded) {
-              setState(() {
-                _isCategoryExpanded = expanded;
-              });
+              _isCategoryExpanded.value = expanded;
             },
             children: [
               SizedBox(
@@ -213,7 +246,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   itemCount: _categories.length,
                   itemBuilder: (context, index) {
                     final category = _categories[index];
-                    final isSelected = _selectedCategory == category['id'];
+                    final isSelected = _selectedCategory.value == category['id'];
                     return ListTile(
                       leading: Text(
                         category['icon']!,
@@ -235,7 +268,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
             ],
-          ),
+          )),
           const Divider(height: 24),
 
           // Distance Slider
@@ -247,17 +280,17 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Row(
+          Obx(() => Row(
             children: [
               Expanded(
                 child: Slider(
-                  value: _selectedDistance,
+                  value: _selectedDistance.value,
                   min: 5,
                   max: 50,
                   divisions: 9,
-                  label: '${_selectedDistance.toInt()} km',
+                  label: '${_selectedDistance.value.toInt()} km',
                   onChanged: (value) {
-                    setState(() => _selectedDistance = value);
+                    _selectedDistance.value = value;
                     _applyFilters();
                   },
                   activeColor: const Color(0xFF2563EB),
@@ -266,12 +299,12 @@ class _SearchScreenState extends State<SearchScreen> {
               SizedBox(
                 width: 50,
                 child: Text(
-                  '${_selectedDistance.toInt()} km',
+                  '${_selectedDistance.value.toInt()} km',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
             ],
-          ),
+          )),
           const SizedBox(height: 16),
 
           // Rating Slider
@@ -283,17 +316,17 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Row(
+          Obx(() => Row(
             children: [
               Expanded(
                 child: Slider(
-                  value: _selectedRating,
+                  value: _selectedRating.value,
                   min: 0,
                   max: 5,
                   divisions: 10,
-                  label: _selectedRating == 0 ? 'Toutes notes' : '${_selectedRating.toInt()}★',
+                  label: _selectedRating.value == 0 ? 'Toutes notes' : '${_selectedRating.value.toInt()}★',
                   onChanged: (value) {
-                    setState(() => _selectedRating = value);
+                    _selectedRating.value = value;
                     _applyFilters();
                   },
                   activeColor: Colors.amber,
@@ -302,12 +335,12 @@ class _SearchScreenState extends State<SearchScreen> {
               SizedBox(
                 width: 70,
                 child: Text(
-                  _selectedRating == 0 ? 'Toutes' : '${_selectedRating.toInt()}★',
+                  _selectedRating.value == 0 ? 'Toutes' : '${_selectedRating.value.toInt()}★',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
             ],
-          ),
+          )),
         ],
       ),
     );
@@ -415,6 +448,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    searchController.removeListener(_onSearchChanged);
     searchController.dispose();
     super.dispose();
   }

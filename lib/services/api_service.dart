@@ -2,33 +2,28 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'storage_service.dart';
+import 'package:dio/dio.dart';
 
 class ApiService {
   // ============================================================
   // BASE URL - FOR ANDROID EMULATOR
   // ============================================================
-  static const String baseUrl = 'http://192.168.1.36:8081/api/v1';
+  static const String baseUrl = 'http://10.40.184.195:8081/api/v1';
   // FOR PHYSICAL DEVICE (uncomment and use your computer's IP):
   // static const String baseUrl = 'http://192.168.1.36:8081/api/v1';
 
   // ============================================================
-  // FILE UPLOAD
+  // DIO INSTANCE
   // ============================================================
-  static Future<Map<String, dynamic>> uploadFile(String endpoint, String filePath) async {
-    final uri = Uri.parse('$baseUrl$endpoint');
-    final request = http.MultipartRequest('POST', uri);
-
-    final file = await http.MultipartFile.fromPath('file', filePath);
-    request.files.add(file);
-
-    final token = await StorageService.getToken();
-    request.headers['Authorization'] = 'Bearer $token';
-
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-
-    return jsonDecode(responseBody);
-  }
+  static final Dio _dio = Dio(BaseOptions(
+    baseUrl: baseUrl,
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+  ));
 
   // ============================================================
   // TOKEN MANAGEMENT
@@ -47,6 +42,15 @@ class ApiService {
     };
   }
 
+  static Future<Map<String, String>> _dioHeaders() async {
+    final token = await StorageService.getToken();
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
   static void setToken(String token) {
     _cachedToken = token;
     StorageService.saveToken(token);
@@ -58,7 +62,7 @@ class ApiService {
   }
 
   // ============================================================
-  // GENERIC HTTP METHODS
+  // HTTP METHODS WITH HTTP PACKAGE (Existing)
   // ============================================================
 
   static Future<dynamic> get(String endpoint) async {
@@ -137,7 +141,65 @@ class ApiService {
   }
 
   // ============================================================
-  // RESPONSE HANDLER
+  // DIO METHODS (For GET ALL ARTISANS and future use)
+  // ============================================================
+
+  static Future<dynamic> dioGet(String path) async {
+    try {
+      final headers = await _dioHeaders();
+      final response = await _dio.get(
+        path,
+        options: Options(headers: headers),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  static Future<dynamic> dioPost(String path, dynamic data) async {
+    try {
+      final headers = await _dioHeaders();
+      final response = await _dio.post(
+        path,
+        data: data,
+        options: Options(headers: headers),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  static Future<dynamic> dioPut(String path, dynamic data) async {
+    try {
+      final headers = await _dioHeaders();
+      final response = await _dio.put(
+        path,
+        data: data,
+        options: Options(headers: headers),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  static Future<dynamic> dioDelete(String path) async {
+    try {
+      final headers = await _dioHeaders();
+      final response = await _dio.delete(
+        path,
+        options: Options(headers: headers),
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  // ============================================================
+  // RESPONSE HANDLERS
   // ============================================================
 
   static dynamic _handleResponse(http.Response response) {
@@ -177,6 +239,40 @@ class ApiService {
     }
   }
 
+  static Exception _handleDioError(DioException error) {
+    String message = 'Something went wrong';
+
+    if (error.response != null) {
+      switch (error.response?.statusCode) {
+        case 400:
+          message = 'Bad request';
+          break;
+        case 401:
+          message = 'Unauthorized';
+          break;
+        case 403:
+          message = 'Forbidden';
+          break;
+        case 404:
+          message = 'Not found';
+          break;
+        case 500:
+          message = 'Internal server error';
+          break;
+        default:
+          message = error.response?.data['message'] ?? message;
+      }
+    } else if (error.type == DioExceptionType.connectionTimeout) {
+      message = 'Connection timeout';
+    } else if (error.type == DioExceptionType.receiveTimeout) {
+      message = 'Receive timeout';
+    } else if (error.type == DioExceptionType.connectionError) {
+      message = 'No internet connection';
+    }
+
+    return Exception(message);
+  }
+
   // ============================================================
   // AUTHENTICATION ENDPOINTS
   // ============================================================
@@ -205,7 +301,6 @@ class ApiService {
     return response;
   }
 
-  // api_service.dart - Fix register methods
   static Future<Map<String, dynamic>> registerClient({
     required String firstName,
     String? middleName,
@@ -261,8 +356,8 @@ class ApiService {
       'password': password,
       'phoneNumber': phoneNumber,
       'avatarUrl': avatarUrl ?? '',
-      'diploma': diplomaUrl ?? '',      // Changed from diplomaUrl to diploma
-      'officialDoc': officialDocUrl ?? '', // Changed from officialDocUrl to officialDoc
+      'diploma': diplomaUrl ?? '',
+      'officialDoc': officialDocUrl ?? '',
       'category': category,
       'province': province,
       'city': city,
@@ -273,15 +368,38 @@ class ApiService {
     debugPrint('✅ Artisan registered successfully');
     return response;
   }
-  // ✅ ADD THIS METHOD - It's missing or not properly defined
-  static Future<Map<String, dynamic>> getCurrentUser() async {
-    debugPrint('👤 Getting current user from: $baseUrl/auth/me');
-    return await get('/auth/me');
+  // In api_service.dart, add this method:
+
+  static Future<Map<String, dynamic>> createAppointment(Map<String, dynamic> data) async {
+    final response = await post('/appointments', data);
+    return response;
+  }
+  // In api_service.dart, add this method if not already present:
+  static Future<void> deleteRequest(int requestId) async {
+    await delete('/requests/$requestId');
   }
 
-// ============================================================
-// ARTISAN ENDPOINTS (IMPROVED)
-// ============================================================
+  // ============================================================
+  // ARTISAN ENDPOINTS
+  // ============================================================
+
+  static Future<List<dynamic>> getAllArtisans() async {
+    try {
+      // Using Dio for this request
+      final response = await dioGet('/artisans');
+      if (response is List) {
+        return response;
+      } else if (response['data'] is List) {
+        return response['data'];
+      } else if (response['artisans'] is List) {
+        return response['artisans'];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting all artisans: $e');
+      return [];
+    }
+  }
 
   static Future<List<dynamic>> getArtisans({
     String? category,
@@ -307,7 +425,6 @@ class ApiService {
         queryParams['rating'] = rating.toString();
       }
 
-      // Build URL with query parameters
       if (queryParams.isNotEmpty) {
         endpoint += '?';
         endpoint += queryParams.entries
@@ -317,7 +434,7 @@ class ApiService {
 
       debugPrint('📤 GET Artisans: $baseUrl$endpoint');
 
-      final response = await get(endpoint); // Reuse your existing get() method
+      final response = await get(endpoint);
 
       if (response is List) {
         return response;
@@ -329,15 +446,61 @@ class ApiService {
       return [];
     }
   }
-  // Add these methods inside ApiService class
+
+  static Future<Map<String, dynamic>> updateArtisan(int id, Map<String, dynamic> data) async {
+    return await put('/artisans/$id', data);
+  }
+
+  // ============================================================
+  // PROFILE ENDPOINTS
+  // ============================================================
+
+  static Future<Map<String, dynamic>> getCurrentUser() async {
+    debugPrint('👤 Getting current user from: $baseUrl/auth/me');
+    return await get('/auth/me');
+  }
+
+  static Future<Map<String, dynamic>> getCurrentUserProfile() async {
+    try {
+      return await get('/auth/me');
+    } catch (e) {
+      debugPrint('Error fetching current user: $e');
+      rethrow;
+    }
+  }
 
   static Future<Map<String, dynamic>> getArtisanById(int id) async {
     return await get('/artisans/$id');
   }
 
-  static Future<Map<String, dynamic>> updateArtisan(int id, Map<String, dynamic> data) async {
-    return await put('/artisans/$id', data);
+  static Future<Map<String, dynamic>> getArtisanProfile(int id) async {
+    return await get('/artisans/$id');
   }
+
+  static Future<Map<String, dynamic>> getClientProfile(int id) async {
+    return await get('/clients/$id');
+  }
+
+  static Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    return await put('/users/profile', data);
+  }
+
+  // ============================================================
+  // FOLLOW ENDPOINTS
+  // ============================================================
+
+  static Future<Map<String, dynamic>> followArtisan(int artisanId) async {
+    return await post('/artisans/$artisanId/follow', {});
+  }
+
+  static Future<Map<String, dynamic>> unfollowArtisan(int artisanId) async {
+    return await delete('/artisans/$artisanId/follow');
+  }
+
+  static Future<Map<String, dynamic>> checkFollowing(int artisanId) async {
+    return await get('/artisans/$artisanId/is-following');
+  }
+
   // ============================================================
   // POST ENDPOINTS
   // ============================================================
@@ -382,9 +545,7 @@ class ApiService {
     return await put('/requests/$id', data);
   }
 
-  static Future<void> deleteRequest(int id) async {
-    await delete('/requests/$id');
-  }
+
 
   // ============================================================
   // APPOINTMENT ENDPOINTS
@@ -409,43 +570,65 @@ class ApiService {
   static Future<void> markNotificationAsRead(int id) async {
     await put('/notifications/$id', {'isRead': true});
   }
-  // Add to api_service.dart
+  // Add this method to ApiService class
+  static Future<Map<String, dynamic>> uploadFile(String endpoint, String filePath) async {
+    try {
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final request = http.MultipartRequest('POST', uri);
 
+      final file = await http.MultipartFile.fromPath('file', filePath);
+      request.files.add(file);
 
-  // lib/services/api_service.dart
-// Add/update these methods:
+      final token = await StorageService.getToken();
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
 
-// ============================================================
-// IMPROVED FILE UPLOAD METHODS
-// ============================================================
+      request.headers['Accept'] = 'application/json';
+
+      debugPrint('📤 Uploading file to: $uri');
+
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return jsonDecode(responseBody);
+      } else {
+        throw Exception('Upload failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Upload error: $e');
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // FILE UPLOAD ENDPOINTS
+  // ============================================================
 
   static Future<String> uploadImage(String filePath) async {
     try {
       final uri = Uri.parse('$baseUrl/upload/image');
       final request = http.MultipartRequest('POST', uri);
 
-      // Add file
       final file = await http.MultipartFile.fromPath('file', filePath);
       request.files.add(file);
 
-      // ✅ Allow uploads without token during registration
       final token = await StorageService.getToken();
       if (token != null && token.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $token';
       }
 
-      // Add other headers
       request.headers['Accept'] = 'application/json';
 
-      print('📤 Uploading image to: $uri');
-      print('📤 File: ${file.filename}, Size: ${await file.length} bytes');
+      debugPrint('📤 Uploading image to: $uri');
+      debugPrint('📤 File: ${file.filename}');
 
-      // Send request with timeout
       final response = await request.send().timeout(const Duration(seconds: 30));
       final responseBody = await response.stream.bytesToString();
 
-      print('📥 Upload response status: ${response.statusCode}');
-      print('📥 Upload response body: $responseBody');
+      debugPrint('📥 Upload response status: ${response.statusCode}');
+      debugPrint('📥 Upload response body: $responseBody');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(responseBody);
@@ -460,14 +643,13 @@ class ApiService {
           throw Exception('No URL in response: $responseBody');
         }
       } else {
-        // Handle authentication errors
         if (response.statusCode == 401) {
           throw Exception('Session expired. Please login again.');
         }
         throw Exception('Upload failed with status ${response.statusCode}: $responseBody');
       }
     } catch (e) {
-      print('❌ Upload error: $e');
+      debugPrint('❌ Upload error: $e');
       rethrow;
     }
   }
@@ -477,27 +659,24 @@ class ApiService {
       final uri = Uri.parse('$baseUrl/upload/document');
       final request = http.MultipartRequest('POST', uri);
 
-      // Add file
       final file = await http.MultipartFile.fromPath('file', filePath);
       request.files.add(file);
 
-      // ✅ Allow uploads without token during registration
       final token = await StorageService.getToken();
       if (token != null && token.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $token';
       }
-      // Add other headers
+
       request.headers['Accept'] = 'application/json';
 
-      print('📤 Uploading document to: $uri');
-      print('📤 File: ${file.filename}, Size: ${await file.length} bytes');
+      debugPrint('📤 Uploading document to: $uri');
+      debugPrint('📤 File: ${file.filename}');
 
-      // Send request with timeout
       final response = await request.send().timeout(const Duration(seconds: 30));
       final responseBody = await response.stream.bytesToString();
 
-      print('📥 Upload response status: ${response.statusCode}');
-      print('📥 Upload response body: $responseBody');
+      debugPrint('📥 Upload response status: ${response.statusCode}');
+      debugPrint('📥 Upload response body: $responseBody');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(responseBody);
@@ -512,39 +691,14 @@ class ApiService {
           throw Exception('No URL in response: $responseBody');
         }
       } else {
-        // Handle authentication errors
         if (response.statusCode == 401) {
           throw Exception('Session expired. Please login again.');
         }
         throw Exception('Upload failed with status ${response.statusCode}: $responseBody');
       }
     } catch (e) {
-      print('❌ Upload error: $e');
+      debugPrint('❌ Upload error: $e');
       rethrow;
     }
-  }
-  // ============================================================
-// PROFILE ENDPOINTS
-// ============================================================
-
-  static Future<Map<String, dynamic>> getCurrentUserProfile() async {
-    try {
-      return await get('/auth/me'); // or '/users/me' depending on your backend
-    } catch (e) {
-      print('Error fetching current user: $e');
-      rethrow;
-    }
-  }
-
-  static Future<Map<String, dynamic>> getArtisanProfile(int id) async {
-    return await get('/artisans/$id');
-  }
-
-  static Future<Map<String, dynamic>> getClientProfile(int id) async {
-    return await get('/clients/$id');
-  }
-
-  static Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
-    return await put('/users/profile', data);
   }
 }

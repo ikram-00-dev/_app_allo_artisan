@@ -1,3 +1,4 @@
+import 'package:allo_artisan_gpt/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:allo_artisan_gpt/core/widgets/client_tile.dart';
@@ -5,6 +6,7 @@ import '../../controllers/auth_controller.dart';
 import '../../controllers/request_controller.dart';
 import '../../routes/app_routes.dart';
 import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
+import '../../core/widgets/share_post_modal.dart';
 
 class ArtisanHomeScreen extends StatefulWidget {
   const ArtisanHomeScreen({super.key});
@@ -145,12 +147,25 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   // ============================================================
   // 🔘 Share Work Button
   // ============================================================
+  // Update the share post button in artisan_home_screen.dart
+// Replace the _buildArtisanPostButton method with:
+
   Widget _buildArtisanPostButton(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: ElevatedButton(
         onPressed: () {
-          Get.toNamed(AppRoutes.artisanPrivateProfile);
+          // Show the share post modal
+          showDialog(
+            context: context,
+            barrierDismissible: true,
+            builder: (context) => SharePostModal(
+              onPostCreated: () {
+                // Navigate to private profile after posting
+                Get.toNamed(AppRoutes.artisanPrivateProfile);
+              },
+            ),
+          );
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF2563EB),
@@ -443,6 +458,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
+                      // ENVOYER - Open chat screen
                       Get.toNamed(
                         AppRoutes.messages,
                         arguments: {
@@ -469,8 +485,27 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {
-                      _showDeclineDialog(context, demand['idRequest'] ?? demand['IDRequest']);
+                    onPressed: () async {
+                      final requestId = demand['idRequest'] ??
+                          demand['IDRequest'] ??
+                          demand['id'];
+
+                      if (requestId != null) {
+                        // Show confirmation dialog
+                        final confirm = await _showIgnoreDialog(context);
+                        if (confirm) {
+                          await requestController.ignoreRequest(requestId);
+                          setState(() {}); // Refresh UI
+                        }
+                      } else {
+                        // For mock data - just remove locally
+                        setState(() {
+                          mockNormalDemands.removeWhere((d) =>
+                          d['idRequest'] == requestId ||
+                              d['IDRequest'] == requestId);
+                        });
+                        Get.snackbar('Info', 'Demande ignorée');
+                      }
                     },
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFF3B82F6)),
@@ -490,6 +525,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ],
             ),
           ),
+
         ],
       ),
     );
@@ -653,8 +689,26 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {
-                      _showDeclineDialog(context, demand['idRequest'] ?? demand['IDRequest']);
+                    onPressed: () async {
+                      final requestId = demand['idRequest'] ??
+                          demand['IDRequest'] ??
+                          demand['id'];
+
+                      if (requestId != null) {
+                        final confirm = await _showDeclineConfirmationDialog(context);
+                        if (confirm) {
+                          await requestController.declineRequest(requestId);
+                          setState(() {}); // Refresh UI
+                        }
+                      } else {
+                        // For mock data
+                        setState(() {
+                          mockUrgentDemands.removeWhere((d) =>
+                          d['idRequest'] == requestId ||
+                              d['IDRequest'] == requestId);
+                        });
+                        Get.snackbar('Info', 'Demande refusée');
+                      }
                     },
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFFEF4444)),
@@ -678,6 +732,71 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
       ),
     );
   }
+  // Add these helper methods to the _ArtisanHomeScreenState class:
+
+  Future<bool> _showIgnoreDialog(BuildContext context) async {
+    return await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.grey, size: 28),
+            SizedBox(width: 12),
+            Text('Ignorer la demande'),
+          ],
+        ),
+        content: const Text(
+          'Cette demande disparaîtra de votre fil. Vous pourrez toujours y accéder depuis vos archives.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey,
+            ),
+            child: const Text('Ignorer'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  Future<bool> _showDeclineConfirmationDialog(BuildContext context) async {
+    return await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.cancel, color: Color(0xFFEF4444), size: 28),
+            SizedBox(width: 12),
+            Text('Refuser la demande urgente'),
+          ],
+        ),
+        content: const Text(
+          'Êtes-vous sûr de vouloir refuser cette demande urgente?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+            ),
+            child: const Text('Refuser'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
@@ -691,33 +810,68 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   }
 
   void _showAcceptDialog(BuildContext context, Map<String, dynamic> demand) {
-    final clientName = demand['client']?['username'] ?? demand['name'] ?? demand['clientName'] ?? 'ce client';
+    final clientName = demand['client']?['username'] ??
+        demand['client']?['name'] ??
+        demand['name'] ??
+        demand['clientName'] ??
+        'ce client';
+
+    final clientId = demand['clientId'] ??
+        demand['clientID'] ??
+        demand['ClientID'] ??
+        demand['client']?['id'] ??
+        demand['client']?['idUser'];
+
+    final requestId = demand['idRequest'] ??
+        demand['IDRequest'] ??
+        demand['id'];
+
+    final isUrgent = demand['isUrgent'] == true ||
+        demand['type'] == 'urgent';
 
     Get.dialog(
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 28),
+            Icon(
+              isUrgent ? Icons.warning_amber_rounded : Icons.check_circle,
+              color: isUrgent ? const Color(0xFFEF4444) : const Color(0xFF22C55E),
+              size: 28,
+            ),
             const SizedBox(width: 12),
-            const Text('Accepter la demande'),
+            Text(
+              isUrgent ? 'Accepter la demande urgente' : 'Accepter la demande',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Voulez-vous accepter la demande urgente de $clientName?'),
+            Text(
+              'Voulez-vous accepter la demande${isUrgent ? ' urgente' : ''} de $clientName?',
+              style: const TextStyle(fontSize: 16),
+            ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withOpacity(0.1),
+                color: isUrgent
+                    ? const Color(0xFFEF4444).withOpacity(0.1)
+                    : const Color(0xFF22C55E).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                '⚠️ Le client sera notifié immédiatement',
-                style: TextStyle(fontSize: 12, color: Color(0xFFEF4444)),
+              child: Text(
+                isUrgent
+                    ? '⚠️ Demande urgente - Un rendez-vous sera créé automatiquement'
+                    : '✅ Le client sera notifié immédiatement',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isUrgent ? const Color(0xFFEF4444) : const Color(0xFF22C55E),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -725,29 +879,62 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Get.back(),
-            child: const Text('Annuler'),
+            child: const Text('Annuler', style: TextStyle(fontSize: 14)),
           ),
           ElevatedButton(
             onPressed: () async {
-              Get.back();
-              final requestId = demand['idRequest'] ?? demand['IDRequest'];
+              Get.back(); // Close dialog
+
+              // Show loading
+              Get.dialog(
+                const Center(child: CircularProgressIndicator()),
+                barrierDismissible: false,
+              );
+
               if (requestId != null) {
+                // FIXED: Call acceptRequest with single parameter
+                // The appointment creation should happen inside the controller
                 final success = await requestController.acceptRequest(requestId);
+
+                // Close loading dialog
+                Get.back();
+
                 if (success) {
+                  // FIXED: Use mounted check and refresh
+                  if (mounted) {
+                    setState(() {});
+                  }
+
                   Get.snackbar(
                     'Succès',
-                    '✅ Demande acceptée! Contactez $clientName',
+                    '✅ Demande acceptée! Rendez-vous créé. Vérifiez vos réservations.',
                     backgroundColor: Colors.green,
                     colorText: Colors.white,
+                    snackPosition: SnackPosition.TOP,
+                    duration: const Duration(seconds: 4),
+                    mainButton: TextButton(
+                      onPressed: () => Get.toNamed(AppRoutes.reservations),
+                      child: const Text('VOIR', style: TextStyle(color: Colors.white)),
+                    ),
                   );
                 }
               } else {
-                // Mock action for example data
+                // Close loading dialog
+                Get.back();
+
+                // For mock data
+                if (mounted) {
+                  setState(() {
+                    mockUrgentDemands.removeWhere((d) => d['idRequest'] == requestId);
+                  });
+                }
+
                 Get.snackbar(
                   'Succès',
-                  '✅ Demande acceptée! Contactez $clientName',
+                  '✅ Demande acceptée! Rendez-vous créé.',
                   backgroundColor: Colors.green,
                   colorText: Colors.white,
+                  snackPosition: SnackPosition.TOP,
                 );
               }
             },
@@ -760,7 +947,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
       ),
     );
   }
-
   void _showDeclineDialog(BuildContext context, int? requestId) {
     Get.dialog(
       AlertDialog(

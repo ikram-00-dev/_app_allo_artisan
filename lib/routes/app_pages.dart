@@ -25,7 +25,13 @@ import '../screens/admin/add_moderator_screen.dart';
 import '../screens/admin/admin_panel_screen.dart';
 import '../screens/admin/pending_artisans_screen.dart';
 import '../middleware/admin_middleware.dart';
-import '../middleware/auth_middleware.dart'; // ADD THIS IMPORT
+import '../middleware/auth_middleware.dart';
+import '../controllers/artisan_controller.dart'; // ADD THIS IMPORT
+import '../controllers/artisan_private_profile_controller.dart'; // ADD THIS IMPORT
+// Add this import at the top of app_pages.dart
+import '../controllers/artisan_public_profile_controller.dart';
+import '../controllers/post_controller.dart'; // ADD THIS IMPORT
+
 
 class AppPages {
   // Helper method to get profile screen based on role
@@ -34,7 +40,21 @@ class AppPages {
     final user = await StorageService.getUser();
 
     if (role == 'artisan') {
-      return ArtisanPrivateProfileScreen();
+      // Initialize controllers before showing screen
+      if (!Get.isRegistered<ArtisanController>()) {
+        Get.put(ArtisanController());
+      }
+
+      // Load artisan data
+      final artisanController = Get.find<ArtisanController>();
+      await artisanController.loadDashboard();
+
+      // Initialize private profile controller
+      if (!Get.isRegistered<ArtisanPrivateProfileController>()) {
+        Get.put(ArtisanPrivateProfileController());
+      }
+
+      return const ArtisanPrivateProfileScreen();
     } else {
       // Create client object from user data
       final client = Client(
@@ -81,10 +101,20 @@ class AppPages {
       middlewares: [AuthMiddleware()],
     ),
 
-    // Artisan Private Profile
+    // Artisan Private Profile - WITH CONTROLLER INITIALIZATION
     GetPage(
       name: AppRoutes.artisanPrivateProfile,
-      page: () => const ArtisanPrivateProfileScreen(),
+      page: () => FutureBuilder(
+        future: _initializeArtisanProfile(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return const ArtisanPrivateProfileScreen();
+        },
+      ),
       middlewares: [AuthMiddleware()],
     ),
 
@@ -105,7 +135,7 @@ class AppPages {
     // Reservations
     GetPage(
       name: AppRoutes.reservations,
-      page: () =>  ReservationScreen(),
+      page: () => ReservationScreen(),
       middlewares: [AuthMiddleware()],
     ),
 
@@ -156,5 +186,25 @@ class AppPages {
       page: () => const AddModeratorScreen(),
       middlewares: [AdminMiddleware()],
     ),
+    // In app_pages.dart, update the artisanProfile route
+    GetPage(
+      name: AppRoutes.artisanProfile,
+      page: () => ArtisanProfileScreen(artisanId: Get.arguments),
+      middlewares: [AuthMiddleware()],
+    ),
   ];
+}
+
+// Helper function to initialize artisan profile
+Future<void> _initializeArtisanProfile() async {
+  if (!Get.isRegistered<ArtisanController>()) {
+    Get.put(ArtisanController());
+  }
+
+  final artisanController = Get.find<ArtisanController>();
+  await artisanController.loadDashboard();
+
+  if (!Get.isRegistered<ArtisanPrivateProfileController>()) {
+    Get.put(ArtisanPrivateProfileController());
+  }
 }

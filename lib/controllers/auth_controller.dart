@@ -151,6 +151,7 @@ class AuthController extends GetxController {
         selectedRoleForNav = userRole.toLowerCase();
       }
 
+
       role.value = selectedRoleForNav;
       debugPrint('Using selected role: $selectedRoleForNav');
 
@@ -282,13 +283,15 @@ class AuthController extends GetxController {
   // ============================================================
   // REGISTER ARTISAN - UPDATED to make email and phone optional (at least one required)
   // ============================================================
+  // In your AuthController class, update the registerArtisan method:
+
   Future<bool> registerArtisan({
     required String firstName,
     String? middleName,
     required String lastName,
     required String username,
-    String? email,  // Made nullable
-    String? phoneNumber,  // Made nullable
+    required String email,
+    required String phoneNumber,
     required String password,
     required String category,
     required String province,
@@ -297,65 +300,17 @@ class AuthController extends GetxController {
     String? avatarUrl,
     String? diplomaUrl,
     String? officialDocUrl,
-    String? diploma,
     int? experience,
   }) async {
     try {
-      // Validate that at least email OR phone is provided
-      if ((email == null || email.trim().isEmpty) &&
-          (phoneNumber == null || phoneNumber.trim().isEmpty)) {
-        Get.snackbar(
-          "Erreur",
-          "Veuillez fournir au moins un email ou un numéro de téléphone",
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return false;
-      }
-
-      // Validate required documents
-      if (diplomaUrl == null || diplomaUrl.isEmpty) {
-        Get.snackbar(
-          "Erreur",
-          "Le diplôme/certification est requis",
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return false;
-      }
-
-      if (officialDocUrl == null || officialDocUrl.isEmpty) {
-        Get.snackbar(
-          "Erreur",
-          "Le document officiel est requis",
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return false;
-      }
-
-      isLoading.value = true;
-
-      // Use email or generate a placeholder if not provided
-      final String finalEmail = (email != null && email.trim().isNotEmpty)
-          ? email.trim()
-          : "${username}@temp.user";  // Temporary email if only phone provided
-
-      // Use phone or empty string if not provided
-      final String finalPhone = (phoneNumber != null && phoneNumber.trim().isNotEmpty)
-          ? phoneNumber.trim()
-          : '';
-
-      debugPrint('Registering artisan with: email=$finalEmail, phone=$finalPhone');
-
       final response = await ApiService.registerArtisan(
         firstName: firstName,
         middleName: middleName,
         lastName: lastName,
         username: username,
-        email: finalEmail,
+        email: email,
         password: password,
-        phoneNumber: finalPhone,
+        phoneNumber: phoneNumber,
         category: category,
         province: province,
         city: city,
@@ -366,35 +321,89 @@ class AuthController extends GetxController {
         experience: experience,
       );
 
-      debugPrint('Registration response: $response');
-
-      Get.snackbar(
-        "Succès",
-        "Compte artisan créé avec succès!",
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-
-      // AUTO-LOGIN after registration with 'artisans' role
-      final loginSuccess = await login(
-        email: finalEmail,
-        password: password,
-        userRole: 'artisans',
-      );
-
-      return loginSuccess;
+      // Don't auto-login for artisans - they need admin approval
+      return true;
     } catch (e) {
-      debugPrint('Register error: $e');
       Get.snackbar(
         "Erreur",
-        e.toString().replaceFirst('Exception: ', ''),
+        "Impossible de créer le compte: ${e.toString().replaceFirst('Exception: ', '')}",
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        duration: const Duration(seconds: 4),
       );
       return false;
-    } finally {
-      isLoading.value = false;
+    }
+    // Add this method to your existing AuthController class
+    Future<bool> smartLogin({required String email, required String phone, required String password}) async {
+      try {
+        isLoading.value = true;
+
+        // First try to login as client
+        try {
+          final clientResponse = await ApiService.login(
+            email: email,
+            password: password,
+            role: 'clients',
+          );
+
+          if (clientResponse['token'] != null) {
+            token.value = clientResponse['token'];
+            role.value = 'client';
+            await StorageService.saveRole('client');
+
+            final userData = clientResponse['user'];
+            if (userData != null) {
+              user.value = userData;
+              await StorageService.saveUser(userData);
+            }
+
+            Get.offAllNamed("/client-home");
+            return true;
+          }
+        } catch (e) {
+          // Client login failed, try artisan
+          print('Client login failed, trying artisan: $e');
+        }
+
+        // Try to login as artisan
+        try {
+          final artisanResponse = await ApiService.login(
+            email: email,
+            password: password,
+            role: 'artisans',
+          );
+
+          if (artisanResponse['token'] != null) {
+            token.value = artisanResponse['token'];
+            role.value = 'artisan';
+            await StorageService.saveRole('artisan');
+
+            final userData = artisanResponse['user'];
+            if (userData != null) {
+              user.value = userData;
+              await StorageService.saveUser(userData);
+            }
+
+            Get.offAllNamed("/artisan-home");
+            return true;
+          }
+        } catch (e) {
+          print('Artisan login failed: $e');
+        }
+
+        throw Exception('No account found with these credentials');
+
+      } catch (e) {
+        Get.snackbar(
+          "Erreur",
+          e.toString().replaceFirst('Exception: ', ''),
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      } finally {
+        isLoading.value = false;
+      }
     }
   }
 
