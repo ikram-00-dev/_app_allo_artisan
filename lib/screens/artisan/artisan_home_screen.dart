@@ -7,6 +7,7 @@ import '../../controllers/request_controller.dart';
 import '../../routes/app_routes.dart';
 import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
 import '../../core/widgets/share_post_modal.dart';
+import '../../models/request_model.dart';
 
 class ArtisanHomeScreen extends StatefulWidget {
   const ArtisanHomeScreen({super.key});
@@ -21,13 +22,13 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   bool isActiveMode = true;
 
   // ============================================================
-  // 📝 MOCK DATA - Example posts to show design
+  // 📝 MOCK DATA - Example posts to show design (only when no real data)
   // ============================================================
   final List<Map<String, dynamic>> mockNormalDemands = [
     {
-      'idRequest': 1,  // Add this
-      'clientId': 101,  // Add this
-      'clientID': 101,  // Add for compatibility
+      'idRequest': 1,
+      'clientId': 101,
+      'clientID': 101,
       'name': 'Aymen Bousahah',
       'time': 'Il y a 2 heures',
       'category': 'Plomberie',
@@ -39,9 +40,9 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
 
   final List<Map<String, dynamic>> mockUrgentDemands = [
     {
-      'idRequest': 2,  // Add this
-      'clientId': 102,  // Add this
-      'clientID': 102,  // Add for compatibility
+      'idRequest': 2,
+      'clientId': 102,
+      'clientID': 102,
       'name': 'Sarah Benamama',
       'time': 'Il y a 10 min',
       'category': 'Plomberie - Fuite d\'eau',
@@ -54,20 +55,16 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   void onNavBarTapped(int index) {
     switch (index) {
       case 0:
-        break; // Already on home
-
-      case 1: // Reservations
+        break;
+      case 1:
         Get.toNamed(AppRoutes.reservations);
         break;
-
       case 2:
         Get.toNamed(AppRoutes.messages);
         break;
-
       case 3:
         Get.toNamed(AppRoutes.notifications);
         break;
-
       case 4:
         Get.toNamed(AppRoutes.profile);
         break;
@@ -76,15 +73,13 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = authController.user.value;
-
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       bottomNavigationBar: const BottomNavBar(currentIndex: 0),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            await requestController.fetchRequests();
+            await requestController.loadAllRequests();
           },
           child: Obx(() {
             // Show loading indicator only if no mock data and no real data
@@ -116,9 +111,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
     );
   }
 
-  // ============================================================
-// 👤 Artisan Header - Simple icon + greeting
-// ============================================================
   Widget _buildArtisanHeader() {
     return Container(
       width: double.infinity,
@@ -144,24 +136,17 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
       ),
     );
   }
-  // ============================================================
-  // 🔘 Share Work Button
-  // ============================================================
-  // Update the share post button in artisan_home_screen.dart
-// Replace the _buildArtisanPostButton method with:
 
   Widget _buildArtisanPostButton(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: ElevatedButton(
         onPressed: () {
-          // Show the share post modal
           showDialog(
             context: context,
             barrierDismissible: true,
             builder: (context) => SharePostModal(
               onPostCreated: () {
-                // Navigate to private profile after posting
                 Get.toNamed(AppRoutes.artisanPrivateProfile);
               },
             ),
@@ -195,29 +180,28 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   }
 
   // ============================================================
-  // 📰 Dynamic Demands Feed (Real data + Mock examples)
+  // 📰 Dynamic Demands Feed - FIXED for RequestModel
   // ============================================================
   Widget _buildDynamicDemandsFeed() {
-    // Use real data if available, otherwise use mock data as examples
-    final hasRealUrgent = requestController.urgentRequests.isNotEmpty;
-    final hasRealNormal = requestController.normalRequests.isNotEmpty;
+    // Convert RequestModel to Map for display (to keep existing card designs)
+    final List<Map<String, dynamic>> realUrgentDemands =
+    requestController.urgentRequests.map((req) => _requestModelToMap(req)).toList();
 
-    final displayUrgentDemands = hasRealUrgent
-        ? requestController.urgentRequests
-        : mockUrgentDemands;
+    final List<Map<String, dynamic>> realNormalDemands =
+    requestController.normalRequests.map((req) => _requestModelToMap(req)).toList();
 
-    final displayNormalDemands = hasRealNormal
-        ? requestController.normalRequests
-        : mockNormalDemands;
+    final hasRealUrgent = realUrgentDemands.isNotEmpty;
+    final hasRealNormal = realNormalDemands.isNotEmpty;
+
+    final displayUrgentDemands = hasRealUrgent ? realUrgentDemands : mockUrgentDemands;
+    final displayNormalDemands = hasRealNormal ? realNormalDemands : mockNormalDemands;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ============================================================
           // 🔴 Urgent Demands Section
-          // ============================================================
           if (displayUrgentDemands.isNotEmpty) ...[
             Row(
               children: [
@@ -257,14 +241,11 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ...displayUrgentDemands.map((demand) =>
-                _buildUrgentDemandCard(demand, context)),
+            ...displayUrgentDemands.map((demand) => _buildUrgentDemandCard(demand, context)),
             const SizedBox(height: 32),
           ],
 
-          // ============================================================
           // 🟢 Normal Demands Section
-          // ============================================================
           if (displayNormalDemands.isNotEmpty) ...[
             Row(
               children: [
@@ -304,8 +285,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ...displayNormalDemands.map((demand) =>
-                _buildNormalDemandCard(demand, context)),
+            ...displayNormalDemands.map((demand) => _buildNormalDemandCard(demand, context)),
           ],
 
           if (displayUrgentDemands.isEmpty && displayNormalDemands.isEmpty)
@@ -315,22 +295,37 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
     );
   }
 
+  // Helper: Convert RequestModel to Map<String, dynamic> for card compatibility
+  Map<String, dynamic> _requestModelToMap(RequestModel req) {
+    return {
+      'idRequest': req.idRequest,
+      'IDRequest': req.idRequest,
+      'clientId': req.clientId,
+      'clientID': req.clientId,
+      'ClientID': req.clientId,
+      'name': 'Client #${req.clientId}',
+      'clientName': 'Client #${req.clientId}',
+      'time': _formatDate(req.requestDate),
+      'createdAt': req.requestDate.toIso8601String(),
+      'category': req.category,
+      'location': 'Zone ${req.zoneKm ?? 10} km',
+      'zone': req.zoneKm != null ? 'Zone ${req.zoneKm} km' : 'Non spécifié',
+      'zoneKm': req.zoneKm,
+      'description': req.description,
+      'isUrgent': req.isUrgent,
+      'type': req.type,
+      'status': req.status,
+      'latitude': req.latitude,
+      'longitude': req.longitude,
+    };
+  }
+
   // ============================================================
-  // 🟢 Normal Demand Card
-  // ============================================================
-  // ============================================================
-  // 🟢 Normal Demand Card
+  // 🟢 Normal Demand Card - NO DESIGN CHANGE
   // ============================================================
   Widget _buildNormalDemandCard(Map<String, dynamic> demand, BuildContext context) {
-    // Support both real API data and mock data format
     final clientName = demand['client']?['username'] ?? demand['name'] ?? demand['clientName'] ?? 'Client';
-    // In _buildNormalDemandCard and _buildUrgentDemandCard
-    final clientId = demand['clientId'] ??
-        demand['clientID'] ??
-        demand['ClientID'] ??
-        demand['client']?['id'] ??  // If client is an object
-        demand['client']?['idUser'] ??  // Check nested user id
-        demand['userId'];  // Alternative field name
+    final clientId = demand['clientId'] ?? demand['clientID'] ?? demand['ClientID'] ?? demand['client']?['id'] ?? demand['userId'];
     final category = demand['category'] ?? 'Général';
     final location = demand['location'] ?? demand['zone'] ?? 'Non spécifié';
     final description = demand['description'] ?? '';
@@ -339,7 +334,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
     if (demand['time'] != null) {
       createdAt = demand['time'];
     } else if (demand['createdAt'] != null) {
-      createdAt = _formatDate(DateTime.parse(demand['createdAt']));
+      createdAt = _formatDate(DateTime.tryParse(demand['createdAt']) ?? DateTime.now());
     } else {
       createdAt = 'Récemment';
     }
@@ -368,7 +363,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
               children: [
-                // Clickable Avatar using ClientTile
                 ClientTile(
                   clientId: clientId,
                   name: clientName,
@@ -376,8 +370,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                   avatarRadius: 24,
                 ),
                 const SizedBox(width: 12),
-
-                // Clickable Name using ClientTile
                 Expanded(
                   child: ClientTile(
                     clientId: clientId,
@@ -392,7 +384,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                     ),
                   ),
                 ),
-
                 const Icon(Icons.access_time, color: Color(0xFF3B82F6), size: 20),
               ],
             ),
@@ -458,7 +449,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      // ENVOYER - Open chat screen
                       Get.toNamed(
                         AppRoutes.messages,
                         arguments: {
@@ -486,23 +476,17 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () async {
-                      final requestId = demand['idRequest'] ??
-                          demand['IDRequest'] ??
-                          demand['id'];
-
+                      final requestId = demand['idRequest'] ?? demand['IDRequest'] ?? demand['id'];
                       if (requestId != null) {
-                        // Show confirmation dialog
                         final confirm = await _showIgnoreDialog(context);
                         if (confirm) {
                           await requestController.ignoreRequest(requestId);
-                          setState(() {}); // Refresh UI
+                          await requestController.loadAllRequests();
+                          setState(() {});
                         }
                       } else {
-                        // For mock data - just remove locally
                         setState(() {
-                          mockNormalDemands.removeWhere((d) =>
-                          d['idRequest'] == requestId ||
-                              d['IDRequest'] == requestId);
+                          mockNormalDemands.removeWhere((d) => d['idRequest'] == requestId);
                         });
                         Get.snackbar('Info', 'Demande ignorée');
                       }
@@ -525,23 +509,17 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ],
             ),
           ),
-
         ],
       ),
     );
   }
 
   // ============================================================
-  // 🔴 Urgent Demand Card
-  // ============================================================
-  // ============================================================
-  // 🔴 Urgent Demand Card
+  // 🔴 Urgent Demand Card - NO DESIGN CHANGE
   // ============================================================
   Widget _buildUrgentDemandCard(Map<String, dynamic> demand, BuildContext context) {
-    // Support both real API data and mock data format
     final clientName = demand['client']?['username'] ?? demand['name'] ?? demand['clientName'] ?? 'Client';
     final clientId = demand['clientId'] ?? demand['clientID'] ?? demand['ClientID'];
-
     final category = demand['category'] ?? 'Général';
     final location = demand['location'] ?? demand['zone'] ?? 'Non spécifié';
     final description = demand['description'] ?? '';
@@ -550,7 +528,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
     if (demand['time'] != null) {
       createdAt = demand['time'];
     } else if (demand['createdAt'] != null) {
-      createdAt = _formatDate(DateTime.parse(demand['createdAt']));
+      createdAt = _formatDate(DateTime.tryParse(demand['createdAt']) ?? DateTime.now());
     } else {
       createdAt = 'Récemment';
     }
@@ -579,7 +557,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
               children: [
-                // Clickable Avatar
                 ClientTile(
                   clientId: clientId,
                   name: clientName,
@@ -587,8 +564,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                   avatarRadius: 24,
                 ),
                 const SizedBox(width: 12),
-
-                // Clickable Name
                 Expanded(
                   child: ClientTile(
                     clientId: clientId,
@@ -603,7 +578,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                     ),
                   ),
                 ),
-
                 const Icon(Icons.timer, color: Color(0xFFEF4444), size: 20),
               ],
             ),
@@ -690,22 +664,17 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () async {
-                      final requestId = demand['idRequest'] ??
-                          demand['IDRequest'] ??
-                          demand['id'];
-
+                      final requestId = demand['idRequest'] ?? demand['IDRequest'] ?? demand['id'];
                       if (requestId != null) {
                         final confirm = await _showDeclineConfirmationDialog(context);
                         if (confirm) {
                           await requestController.declineRequest(requestId);
-                          setState(() {}); // Refresh UI
+                          await requestController.loadAllRequests();
+                          setState(() {});
                         }
                       } else {
-                        // For mock data
                         setState(() {
-                          mockUrgentDemands.removeWhere((d) =>
-                          d['idRequest'] == requestId ||
-                              d['IDRequest'] == requestId);
+                          mockUrgentDemands.removeWhere((d) => d['idRequest'] == requestId);
                         });
                         Get.snackbar('Info', 'Demande refusée');
                       }
@@ -732,8 +701,10 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
       ),
     );
   }
-  // Add these helper methods to the _ArtisanHomeScreenState class:
 
+  // ============================================================
+  // Helper Methods (unchanged)
+  // ============================================================
   Future<bool> _showIgnoreDialog(BuildContext context) async {
     return await showDialog(
       context: context,
@@ -810,24 +781,9 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   }
 
   void _showAcceptDialog(BuildContext context, Map<String, dynamic> demand) {
-    final clientName = demand['client']?['username'] ??
-        demand['client']?['name'] ??
-        demand['name'] ??
-        demand['clientName'] ??
-        'ce client';
-
-    final clientId = demand['clientId'] ??
-        demand['clientID'] ??
-        demand['ClientID'] ??
-        demand['client']?['id'] ??
-        demand['client']?['idUser'];
-
-    final requestId = demand['idRequest'] ??
-        demand['IDRequest'] ??
-        demand['id'];
-
-    final isUrgent = demand['isUrgent'] == true ||
-        demand['type'] == 'urgent';
+    final clientName = demand['client']?['username'] ?? demand['client']?['name'] ?? demand['name'] ?? demand['clientName'] ?? 'ce client';
+    final requestId = demand['idRequest'] ?? demand['IDRequest'] ?? demand['id'];
+    final isUrgent = demand['isUrgent'] == true || demand['type'] == 'urgent';
 
     Get.dialog(
       AlertDialog(
@@ -858,9 +814,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isUrgent
-                    ? const Color(0xFFEF4444).withOpacity(0.1)
-                    : const Color(0xFF22C55E).withOpacity(0.1),
+                color: isUrgent ? const Color(0xFFEF4444).withOpacity(0.1) : const Color(0xFF22C55E).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -883,31 +837,19 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Get.back(); // Close dialog
-
-              // Show loading
-              Get.dialog(
-                const Center(child: CircularProgressIndicator()),
-                barrierDismissible: false,
-              );
+              Get.back();
+              Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
 
               if (requestId != null) {
-                // FIXED: Call acceptRequest with single parameter
-                // The appointment creation should happen inside the controller
                 final success = await requestController.acceptRequest(requestId);
-
-                // Close loading dialog
                 Get.back();
 
-                if (success) {
-                  // FIXED: Use mounted check and refresh
-                  if (mounted) {
-                    setState(() {});
-                  }
-
+                if (success && mounted) {
+                  await requestController.loadAllRequests();
+                  setState(() {});
                   Get.snackbar(
                     'Succès',
-                    '✅ Demande acceptée! Rendez-vous créé. Vérifiez vos réservations.',
+                    '✅ Demande acceptée! Rendez-vous créé.',
                     backgroundColor: Colors.green,
                     colorText: Colors.white,
                     snackPosition: SnackPosition.TOP,
@@ -919,70 +861,17 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                   );
                 }
               } else {
-                // Close loading dialog
                 Get.back();
-
-                // For mock data
-                if (mounted) {
-                  setState(() {
-                    mockUrgentDemands.removeWhere((d) => d['idRequest'] == requestId);
-                  });
-                }
-
-                Get.snackbar(
-                  'Succès',
-                  '✅ Demande acceptée! Rendez-vous créé.',
-                  backgroundColor: Colors.green,
-                  colorText: Colors.white,
-                  snackPosition: SnackPosition.TOP,
-                );
+                setState(() {
+                  mockUrgentDemands.removeWhere((d) => d['idRequest'] == requestId);
+                });
+                Get.snackbar('Succès', '✅ Demande acceptée!');
               }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF22C55E),
             ),
             child: const Text('Accepter'),
-          ),
-        ],
-      ),
-    );
-  }
-  void _showDeclineDialog(BuildContext context, int? requestId) {
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.cancel, color: Color(0xFFEF4444), size: 28),
-            const SizedBox(width: 12),
-            const Text('Refuser la demande'),
-          ],
-        ),
-        content: const Text(
-          'Êtes-vous sûr de vouloir refuser cette demande?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Get.back();
-              if (requestId != null) {
-                final success = await requestController.declineRequest(requestId);
-                if (success) {
-                  Get.snackbar('Info', 'Demande refusée');
-                }
-              } else {
-                // Mock action for example data
-                Get.snackbar('Info', 'Demande refusée');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-            ),
-            child: const Text('Refuser'),
           ),
         ],
       ),

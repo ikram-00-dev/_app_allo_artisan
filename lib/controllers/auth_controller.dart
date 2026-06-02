@@ -5,11 +5,11 @@ import '../services/storage_service.dart';
 
 class AuthController extends GetxController {
   // ============================================================
-  // STATE
+  // STATE - Make sure these are Rx types
   // ============================================================
   var isLoading = false.obs;
   var token = ''.obs;
-  var role = ''.obs;
+  var role = ''.obs;  // ✅ This is RxString
   var user = Rxn<Map<String, dynamic>>();
 
   @override
@@ -24,18 +24,20 @@ class AuthController extends GetxController {
 
     if (savedToken != null && savedToken.isNotEmpty) {
       token.value = savedToken;
-      role.value = savedRole ?? '';
+      if (savedRole != null) {
+        role.value = savedRole;  // ✅ Use .value
+      }
       await loadCurrentUser();
 
       // Auto-navigate based on saved role
       _navigateBasedOnRole(role.value);
     }
   }
-  // Add this method to AuthController class
+
   Future<void> setAdminMode() async {
-    role.value = 'admin';
+    role.value = 'admin';  // ✅ Use .value
     await StorageService.saveRole('admin');
-    token.value = 'admin_token'; // Placeholder token
+    token.value = 'admin_token';
     user.value = {
       'email': 'ikram2005@gmail.com',
       'role': 'admin',
@@ -45,10 +47,8 @@ class AuthController extends GetxController {
     await StorageService.saveUser(user.value!);
   }
 
-
-  // Add this method to AuthController class
   Future<void> setModeratorMode() async {
-    role.value = 'moderator';
+    role.value = 'moderator';  // ✅ Use .value
     await StorageService.saveRole('moderator');
     token.value = 'moderator_session_token';
     user.value = {
@@ -62,59 +62,9 @@ class AuthController extends GetxController {
   }
 
   // ============================================================
-  // SWITCH ROLE
+  // LOGIN - FIXED
   // ============================================================
-  Future<void> switchRole(String newRole) async {
-    try {
-      // Don't do anything if already in this role
-      if (role.value == newRole) {
-        Get.snackbar(
-          "Information",
-          "Vous êtes déjà en mode ${newRole == 'artisan' ? 'Artisan' : 'Client'}",
-          snackPosition: SnackPosition.TOP,
-          duration: const Duration(seconds: 2),
-        );
-        return;
-      }
-
-      isLoading.value = true;
-
-      // Update the role
-      role.value = newRole;
-
-      // Save to storage
-      await StorageService.saveRole(newRole);
-
-      // Show success message
-      Get.snackbar(
-        "Mode changé",
-        "Vous êtes maintenant en mode ${newRole == 'artisan' ? 'Artisan' : 'Client'}",
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2),
-      );
-
-      // Navigate based on new role
-      _navigateBasedOnRole(newRole);
-
-    } catch (e) {
-      debugPrint('Error switching role: $e');
-      Get.snackbar(
-        "Erreur",
-        "Impossible de changer de mode",
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  // ============================================================
-  // LOGIN
-  // ============================================================
+  // LOGIN - FIXED with better user data storage
   Future<bool> login({
     required String email,
     required String password,
@@ -133,15 +83,13 @@ class AuthController extends GetxController {
 
       debugPrint('Login response: $response');
 
-      // Check if response contains token
       if (response['token'] == null) {
         throw Exception('Invalid response from server');
       }
 
       token.value = response['token'];
 
-      // CRITICAL: Use the SELECTED role from login screen, NOT from backend
-      // Convert 'clients' -> 'client' and 'artisans' -> 'artisan' for navigation
+      // Convert role for navigation
       String selectedRoleForNav = '';
       if (userRole == 'clients') {
         selectedRoleForNav = 'client';
@@ -151,18 +99,48 @@ class AuthController extends GetxController {
         selectedRoleForNav = userRole.toLowerCase();
       }
 
-
       role.value = selectedRoleForNav;
-      debugPrint('Using selected role: $selectedRoleForNav');
+      debugPrint('Using selected role: ${role.value}');
 
-      // Save role to storage immediately
+      // Save token to storage
+      await StorageService.saveToken(response['token']);
+
+      // Save role to storage
       await StorageService.saveRole(selectedRoleForNav);
 
-      // Save user data if available
-      final userData = response['user'];
-      if (userData != null) {
-        user.value = userData;
-        await StorageService.saveUser(userData);
+      // Save user data - CRITICAL FIX
+      final userData = response['user'] ?? response;
+      if (userData != null && userData is Map<String, dynamic>) {
+        // Make sure we have the ID field properly
+        Map<String, dynamic> enhancedUserData = Map.from(userData);
+
+        // Ensure we have an 'id' field (not 'ID' or 'clientId')
+        if (enhancedUserData['ID'] != null && enhancedUserData['id'] == null) {
+          enhancedUserData['id'] = enhancedUserData['ID'];
+          debugPrint('✅ Added "id" field from "ID": ${enhancedUserData['id']}');
+        }
+
+        if (enhancedUserData['clientId'] != null && enhancedUserData['id'] == null) {
+          enhancedUserData['id'] = enhancedUserData['clientId'];
+          debugPrint('✅ Added "id" field from "clientId": ${enhancedUserData['id']}');
+        }
+
+        // Also ensure clientId field exists for RequestController
+        if (enhancedUserData['id'] != null && enhancedUserData['clientId'] == null) {
+          enhancedUserData['clientId'] = enhancedUserData['id'];
+          debugPrint('✅ Added "clientId" field from "id": ${enhancedUserData['clientId']}');
+        }
+
+        user.value = enhancedUserData;
+        await StorageService.saveUser(enhancedUserData);
+
+        debugPrint('✅ User data saved to storage:');
+        debugPrint('   - id: ${enhancedUserData['id']}');
+        debugPrint('   - clientId: ${enhancedUserData['clientId']}');
+        debugPrint('   - role: ${enhancedUserData['role']}');
+        debugPrint('   - email: ${enhancedUserData['email']}');
+      } else {
+        debugPrint('⚠️ No user data in response');
       }
 
       Get.snackbar(
@@ -172,12 +150,10 @@ class AuthController extends GetxController {
         duration: const Duration(seconds: 2),
       );
 
-      // Navigate based on SELECTED role
+      // Navigate based on role
       if (selectedRoleForNav == "artisan") {
-        debugPrint('Navigating to Artisan Home (selected role: artisan)');
         Get.offAllNamed("/artisan-home");
       } else {
-        debugPrint('Navigating to Client Home (selected role: client)');
         Get.offAllNamed("/client-home");
       }
 
@@ -198,20 +174,131 @@ class AuthController extends GetxController {
   }
 
   // ============================================================
-  // REGISTER CLIENT - UPDATED to make email and phone optional (at least one required)
+  // SMART LOGIN - Complete implementation
+  // ============================================================
+  Future<bool> smartLogin({
+    required String emailOrPhone,
+    required String password,
+  }) async {
+    try {
+      isLoading.value = true;
+
+      final bool isEmail = emailOrPhone.contains('@') && emailOrPhone.contains('.');
+
+      debugPrint('Smart login with: $emailOrPhone (${isEmail ? "email" : "phone"})');
+
+      // Try both roles
+      List<String> rolesToTry = ['clients', 'artisans'];
+
+      for (String roleToTry in rolesToTry) {
+        try {
+          final response = await ApiService.login(
+            email: isEmail ? emailOrPhone : '',
+            password: password,
+            role: roleToTry,
+          );
+
+          if (response['token'] != null) {
+            token.value = response['token'];
+
+            String selectedRoleForNav = roleToTry == 'clients' ? 'client' : 'artisan';
+            role.value = selectedRoleForNav;  // ✅ Use .value
+
+            await StorageService.saveRole(selectedRoleForNav);
+
+            final userData = response['user'] ?? response;
+            if (userData != null && userData is Map<String, dynamic>) {
+              user.value = userData;
+              await StorageService.saveUser(userData);
+            }
+
+            Get.snackbar(
+              "Succès",
+              "Connexion réussie",
+              snackPosition: SnackPosition.TOP,
+              backgroundColor: Colors.green,
+              colorText: Colors.white,
+            );
+
+            if (selectedRoleForNav == "artisan") {
+              Get.offAllNamed("/artisan-home");
+            } else {
+              Get.offAllNamed("/client-home");
+            }
+
+            return true;
+          }
+        } catch (e) {
+          debugPrint('Failed as $roleToTry: $e');
+        }
+      }
+
+      throw Exception('Email/Phone or password incorrect');
+
+    } catch (e) {
+      Get.snackbar(
+        "Erreur",
+        e.toString().replaceFirst('Exception: ', ''),
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // ============================================================
+  // SWITCH ROLE
+  // ============================================================
+  Future<void> switchRole(String newRole) async {
+    try {
+      if (role.value == newRole) {  // ✅ Use .value
+        Get.snackbar(
+          "Information",
+          "Vous êtes déjà en mode ${newRole == 'artisan' ? 'Artisan' : 'Client'}",
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 2),
+        );
+        return;
+      }
+
+      isLoading.value = true;
+      role.value = newRole;  // ✅ Use .value
+      await StorageService.saveRole(newRole);
+
+      Get.snackbar(
+        "Mode changé",
+        "Vous êtes maintenant en mode ${newRole == 'artisan' ? 'Artisan' : 'Client'}",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+
+      _navigateBasedOnRole(newRole);
+    } catch (e) {
+      debugPrint('Error switching role: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // ============================================================
+  // REGISTER CLIENT
   // ============================================================
   Future<bool> registerClient({
     required String firstName,
     String? middleName,
     required String lastName,
     required String username,
-    String? email,  // Made nullable
-    String? phoneNumber,  // Made nullable
+    String? email,
+    String? phoneNumber,
     required String password,
     String? avatarUrl,
   }) async {
     try {
-      // Validate that at least email OR phone is provided
       if ((email == null || email.trim().isEmpty) &&
           (phoneNumber == null || phoneNumber.trim().isEmpty)) {
         Get.snackbar(
@@ -225,17 +312,13 @@ class AuthController extends GetxController {
 
       isLoading.value = true;
 
-      // Use email or generate a placeholder if not provided
       final String finalEmail = (email != null && email.trim().isNotEmpty)
           ? email.trim()
-          : "${username}@temp.user";  // Temporary email if only phone provided
+          : "${username}@temp.user";
 
-      // Use phone or empty string if not provided
       final String finalPhone = (phoneNumber != null && phoneNumber.trim().isNotEmpty)
           ? phoneNumber.trim()
           : '';
-
-      debugPrint('Registering client with: email=$finalEmail, phone=$finalPhone');
 
       final response = await ApiService.registerClient(
         firstName: firstName,
@@ -248,8 +331,6 @@ class AuthController extends GetxController {
         avatarUrl: avatarUrl,
       );
 
-      debugPrint('Registration response: $response');
-
       Get.snackbar(
         "Succès",
         "Compte client créé avec succès!",
@@ -257,22 +338,17 @@ class AuthController extends GetxController {
         colorText: Colors.white,
       );
 
-      // AUTO-LOGIN after registration with 'clients' role
-      final loginSuccess = await login(
+      return await login(
         email: finalEmail,
         password: password,
         userRole: 'clients',
       );
-
-      return loginSuccess;
     } catch (e) {
-      debugPrint('Register error: $e');
       Get.snackbar(
         "Erreur",
         e.toString().replaceFirst('Exception: ', ''),
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        duration: const Duration(seconds: 4),
       );
       return false;
     } finally {
@@ -281,10 +357,8 @@ class AuthController extends GetxController {
   }
 
   // ============================================================
-  // REGISTER ARTISAN - UPDATED to make email and phone optional (at least one required)
+  // REGISTER ARTISAN
   // ============================================================
-  // In your AuthController class, update the registerArtisan method:
-
   Future<bool> registerArtisan({
     required String firstName,
     String? middleName,
@@ -303,6 +377,8 @@ class AuthController extends GetxController {
     int? experience,
   }) async {
     try {
+      isLoading.value = true;
+
       final response = await ApiService.registerArtisan(
         firstName: firstName,
         middleName: middleName,
@@ -321,7 +397,14 @@ class AuthController extends GetxController {
         experience: experience,
       );
 
-      // Don't auto-login for artisans - they need admin approval
+      Get.snackbar(
+        "Succès",
+        "Compte artisan créé avec succès! En attente d'approbation.",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
+      Get.offAllNamed("/login");
       return true;
     } catch (e) {
       Get.snackbar(
@@ -331,101 +414,27 @@ class AuthController extends GetxController {
         colorText: Colors.white,
       );
       return false;
+    } finally {
+      isLoading.value = false;
     }
-    // Add this method to your existing AuthController class
-    Future<bool> smartLogin({required String email, required String phone, required String password}) async {
-      try {
-        isLoading.value = true;
-
-        // First try to login as client
-        try {
-          final clientResponse = await ApiService.login(
-            email: email,
-            password: password,
-            role: 'clients',
-          );
-
-          if (clientResponse['token'] != null) {
-            token.value = clientResponse['token'];
-            role.value = 'client';
-            await StorageService.saveRole('client');
-
-            final userData = clientResponse['user'];
-            if (userData != null) {
-              user.value = userData;
-              await StorageService.saveUser(userData);
-            }
-
-            Get.offAllNamed("/client-home");
-            return true;
-          }
-        } catch (e) {
-          // Client login failed, try artisan
-          print('Client login failed, trying artisan: $e');
-        }
-
-        // Try to login as artisan
-        try {
-          final artisanResponse = await ApiService.login(
-            email: email,
-            password: password,
-            role: 'artisans',
-          );
-
-          if (artisanResponse['token'] != null) {
-            token.value = artisanResponse['token'];
-            role.value = 'artisan';
-            await StorageService.saveRole('artisan');
-
-            final userData = artisanResponse['user'];
-            if (userData != null) {
-              user.value = userData;
-              await StorageService.saveUser(userData);
-            }
-
-            Get.offAllNamed("/artisan-home");
-            return true;
-          }
-        } catch (e) {
-          print('Artisan login failed: $e');
-        }
-
-        throw Exception('No account found with these credentials');
-
-      } catch (e) {
-        Get.snackbar(
-          "Erreur",
-          e.toString().replaceFirst('Exception: ', ''),
-          snackPosition: SnackPosition.TOP,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return false;
-      } finally {
-        isLoading.value = false;
-      }
-    }
-  }
-
-  // Helper method for navigation based on role
-  void _navigateBasedOnRole(String role) {
-    if (role == "artisan") {
-      Get.offAllNamed("/artisan-home");
-    } else if (role == "client") {
-      Get.offAllNamed("/client-home");
-    }
-    // Don't navigate if role is empty or unknown
   }
 
   // ============================================================
+  // HELPER METHODS
+  // ============================================================
+  void _navigateBasedOnRole(String roleValue) {
+    if (roleValue == "artisan") {
+      Get.offAllNamed("/artisan-home");
+    } else if (roleValue == "client") {
+      Get.offAllNamed("/client-home");
+    }
+  }
+
   Future<void> loadCurrentUser() async {
     try {
       final response = await ApiService.getCurrentUser();
-      debugPrint('Current user response: $response');
       user.value = response;
 
-      // Don't override role from backend if we already have it
-      // Only set if not already set
       if (role.value.isEmpty) {
         if (response['Role'] != null) {
           role.value = response['Role'].toString().toLowerCase();
@@ -438,26 +447,16 @@ class AuthController extends GetxController {
     }
   }
 
-  // ============================================================
-  // LOGOUT
-  // ============================================================
   Future<void> logout() async {
     await ApiService.clearToken();
     token.value = '';
     role.value = '';
     user.value = null;
-
     Get.offAllNamed("/login");
-
-    Get.snackbar(
-      "Déconnexion",
-      "Vous avez été déconnecté",
-      snackPosition: SnackPosition.TOP,
-    );
   }
 
   // ============================================================
-  // HELPERS
+  // GETTERS
   // ============================================================
   bool get isClient => role.value == 'client';
   bool get isArtisan => role.value == 'artisan';

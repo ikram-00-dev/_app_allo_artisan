@@ -8,7 +8,7 @@ class ApiService {
   // ============================================================
   // BASE URL - FOR ANDROID EMULATOR
   // ============================================================
-  static const String baseUrl = 'http://10.40.184.195:8081/api/v1';
+  static const String baseUrl = 'http://192.168.1.36:8081/api/v1';
   // FOR PHYSICAL DEVICE (uncomment and use your computer's IP):
   // static const String baseUrl = 'http://192.168.1.36:8081/api/v1';
 
@@ -32,7 +32,7 @@ class ApiService {
 
   static Future<Map<String, String>> _headers() async {
     final token = await StorageService.getToken();
-    _cachedToken = token;
+    debugPrint('🔑 Token for request: ${token != null ? 'Present (length: ${token.length})' : 'NULL'}');
 
     return {
       "Content-Type": "application/json",
@@ -374,10 +374,7 @@ class ApiService {
     final response = await post('/appointments', data);
     return response;
   }
-  // In api_service.dart, add this method if not already present:
-  static Future<void> deleteRequest(int requestId) async {
-    await delete('/requests/$requestId');
-  }
+
 
   // ============================================================
   // ARTISAN ENDPOINTS
@@ -530,23 +527,382 @@ class ApiService {
   }
 
   // ============================================================
-  // REQUEST ENDPOINTS
-  // ============================================================
+// REQUEST ENDPOINTS - MATCHING GENERIC CRUD CONTROLLER
+// ============================================================
 
+// GET all requests (matches GenericController.GetAll)
   static Future<List<dynamic>> getRequests() async {
-    return await get('/requests');
+    try {
+      final response = await get('/requests');
+      // Generic controller returns array directly
+      if (response is List) {
+        return response;
+      }
+      // Handle wrapped response if any
+      if (response['data'] is List) {
+        return response['data'];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting requests: $e');
+      return [];
+    }
   }
 
-  static Future<Map<String, dynamic>> createRequest(Map<String, dynamic> data) async {
-    return await post('/requests', data);
+// Get single request (matches GenericController.GetOne)
+  static Future<Map<String, dynamic>> getRequest(int id) async {
+    return await get('/requests/$id');
   }
 
-  static Future<Map<String, dynamic>> updateRequest(int id, Map<String, dynamic> data) async {
-    return await put('/requests/$id', data);
+// Upload image for request
+  static Future<String> uploadRequestImage(String filePath) async {
+    try {
+      final uri = Uri.parse('$baseUrl/upload/image');
+      final request = http.MultipartRequest('POST', uri);
+
+      final file = await http.MultipartFile.fromPath('file', filePath);
+      request.files.add(file);
+
+      final token = await StorageService.getToken();
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+
+      request.headers['Accept'] = 'application/json';
+
+      debugPrint('📤 Uploading image to: $uri');
+
+      final response = await request.send().timeout(const Duration(seconds: 30));
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(responseBody);
+        return decoded['url'] ?? decoded['fileUrl'] ?? decoded['imageUrl'] ?? '';
+      } else {
+        throw Exception('Upload failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Upload error: $e');
+      rethrow;
+    }
   }
 
+// CREATE request (matches GenericController.Create)
+  // In api_service.dart - REPLACE the createRequest method with this:
 
+// CREATE request (matches GenericController.Create)
+  // In api_service.dart - Update createRequest method:
 
+ /* static Future<Map<String, dynamic>> createRequest(Map<String, dynamic> data, {String? imagePath}) async {
+    try {
+      // Upload image first if provided
+      String? imageUrl;
+      if (imagePath != null && imagePath.isNotEmpty) {
+        try {
+          imageUrl = await uploadRequestImage(imagePath);
+          debugPrint('✅ Image uploaded: $imageUrl');
+        } catch (e) {
+          debugPrint('⚠️ Warning: Could not upload image: $e');
+        }
+      }
+
+      // Get client ID from the data or from storage
+      int? clientId = data['clientId'] ?? data['ClientID'];
+
+      // If clientId is not in data, try to get from stored user
+      if (clientId == null) {
+        try {
+          final user = await StorageService.getUser();
+          if (user != null) {
+            clientId = user['id'] ?? user['ID'] ?? user['clientId'] ?? user['ClientId'];
+            debugPrint('🔍 Retrieved clientId from storage: $clientId');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Could not get client ID from storage: $e');
+        }
+      }
+
+      if (clientId == null) {
+        throw Exception('Client ID not found. Please login again.');
+      }
+
+      // Build request body matching Go struct exactly
+      final Map<String, dynamic> requestBody = {
+        'Description': data['description']?.toString() ?? data['Description'] ?? '',
+        'Type': data['type']?.toString() ?? data['Type'] ?? 'simple',
+        'Category': data['category']?.toString() ?? data['Category'] ?? '',
+        'ClientID': clientId,
+        'Status': data['status']?.toString() ?? data['Status'] ?? 'active',
+        'RequestDate': DateTime.now().toIso8601String(),
+      };
+
+      // Add optional fields
+      if (data['latitude'] != null) {
+        requestBody['Latitude'] = data['latitude'] is double
+            ? data['latitude']
+            : (data['latitude'] as num).toDouble();
+      }
+
+      if (data['longitude'] != null) {
+        requestBody['Longitude'] = data['longitude'] is double
+            ? data['longitude']
+            : (data['longitude'] as num).toDouble();
+      }
+
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        requestBody['ImageUrl'] = imageUrl;
+      }
+
+      // For urgent requests
+      final isUrgent = data['type'] == 'urgent' || data['isUrgent'] == true;
+      if (isUrgent) {
+        requestBody['PriorityLevel'] = data['priorityLevel'] ?? 'High';
+        if (data['zoneKm'] != null) {
+          requestBody['ZoneKm'] = data['zoneKm'];
+        }
+      }
+
+      debugPrint('📤 Creating request with body: ${jsonEncode(requestBody)}');
+
+      final uri = Uri.parse('$baseUrl/requests');
+      final headers = await _headers();
+
+      final response = await http.post(
+        uri,
+        headers: headers,
+        body: jsonEncode(requestBody),
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint('📥 Response status: ${response.statusCode}');
+      debugPrint('📥 Response body: ${response.body}');
+
+      if (response.body.isEmpty) {
+        throw Exception('Empty response from server');
+      }
+
+      dynamic responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (e) {
+        debugPrint('❌ JSON Parse error: $e');
+        throw Exception('Invalid JSON response from server: ${response.body}');
+      }
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        debugPrint('✅ Request created successfully');
+        return responseData;
+      } else {
+        final errorMsg = responseData['message'] ??
+            responseData['error'] ??
+            'Server error: ${response.statusCode}';
+        throw Exception(errorMsg);
+      }
+    } catch (e) {
+      debugPrint('❌ Create request error: $e');
+      rethrow;
+    }
+  }*/
+  // CREATE request - DEBUG VERSION
+  // CREATE request - DEBUG VERSION (FIXED)
+  // CREATE request - FIXED VERSION for your Go backend
+  static Future<Map<String, dynamic>> createRequest(Map<String, dynamic> data, {String? imagePath}) async {
+    debugPrint('========== CREATE REQUEST START ==========');
+    debugPrint('Input data received: $data');
+
+    try {
+      // Get client ID
+      int? clientId = data['clientId'] ?? data['ClientID'];
+
+      if (clientId == null) {
+        // Try to get from stored user
+        final userJson = await StorageService.getUser();
+        if (userJson != null) {
+          clientId = userJson['id'] ?? userJson['ID'] ?? userJson['clientId'];
+        }
+      }
+
+      if (clientId == null) {
+        throw Exception('Client ID not found. Please login again.');
+      }
+
+      debugPrint('✅ Using clientId: $clientId');
+
+      // Build request body matching Go struct JSON tags (lowercase)
+      final Map<String, dynamic> requestBody = {
+        'description': data['description'] ?? '',  // Matches json:"description"
+        'type': data['type'] ?? 'simple',          // Matches json:"type"
+        'category': data['category'] ?? '',        // Matches json:"category"
+        'clientId': clientId,                      // Matches json:"clientId"
+        'status': 'active',
+      };
+
+      // Add optional fields with correct lowercase names
+      if (data['latitude'] != null) {
+        requestBody['latitude'] = data['latitude'];
+      }
+
+      if (data['longitude'] != null) {
+        requestBody['longitude'] = data['longitude'];
+      }
+
+      // Add zoneKm for urgent requests (matches json:"zoneKm")
+      if (data['zoneKm'] != null && data['zoneKm'] > 0) {
+        requestBody['zoneKm'] = data['zoneKm'];
+      }
+
+      debugPrint('📤 Sending JSON: ${jsonEncode(requestBody)}');
+
+      // Send request
+      final token = await StorageService.getToken();
+      final uri = Uri.parse('$baseUrl/requests');
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint('📥 Response status: ${response.statusCode}');
+      debugPrint('📥 Response body: ${response.body}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (response.body.isEmpty) {
+          return {'success': true, 'message': 'Request created'};
+        }
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Server returned ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('❌ Create request error: $e');
+      rethrow;
+    }
+  }
+
+// UPDATE request (matches GenericController.Update)
+  static Future<Map<String, dynamic>> updateRequest(int id, Map<String, dynamic> data, {String? imagePath, bool removeImage = false}) async {
+    try {
+      // Upload new image if provided
+      String? imageUrl;
+      if (imagePath != null && imagePath.isNotEmpty) {
+        try {
+          imageUrl = await uploadRequestImage(imagePath);
+          debugPrint('✅ Image uploaded for update: $imageUrl');
+        } catch (e) {
+          debugPrint('⚠️ Warning: Could not upload image: $e');
+        }
+      }
+
+      final goData = <String, dynamic>{};
+
+      // Only include fields that are provided (for partial update)
+      if (data.containsKey('description') || data.containsKey('Description')) {
+        goData['Description'] = data['description'] ?? data['Description'];
+      }
+      if (data.containsKey('type') || data.containsKey('Type')) {
+        goData['Type'] = data['type'] ?? data['Type'];
+      }
+      if (data.containsKey('category') || data.containsKey('Category')) {
+        goData['Category'] = data['category'] ?? data['Category'];
+      }
+      if (data.containsKey('status') || data.containsKey('Status')) {
+        goData['Status'] = data['status'] ?? data['Status'];
+      }
+
+      // Handle image updates
+      if (removeImage) {
+        goData['imageUrl'] = '';
+      } else if (imageUrl != null && imageUrl.isNotEmpty) {
+        goData['imageUrl'] = imageUrl;
+      }
+
+      // Handle urgent request specific fields
+      if (data.containsKey('zoneKm')) {
+        goData['ZoneKm'] = data['zoneKm'];
+      }
+      if (data.containsKey('priorityLevel')) {
+        goData['PriorityLevel'] = data['priorityLevel'];
+      }
+
+      // Handle location updates
+      if (data.containsKey('latitude')) goData['Latitude'] = data['latitude'];
+      if (data.containsKey('longitude')) goData['Longitude'] = data['longitude'];
+
+      if (goData.isEmpty) {
+        debugPrint('⚠️ No data to update for request $id');
+        return {'success': true, 'message': 'No changes provided'};
+      }
+
+      debugPrint('📤 Updating request $id with data: $goData');
+
+      return await put('/requests/$id', goData);
+    } catch (e) {
+      debugPrint('❌ Update request error: $e');
+      rethrow;
+    }
+  }
+
+// DELETE request (matches GenericController.Delete)
+  // DELETE request - FIXED VERSION
+  static Future<Map<String, dynamic>> deleteRequest(int requestId) async {
+    try {
+      debugPrint('📤 DELETE request: /requests/$requestId');
+
+      final token = await StorageService.getToken();
+      final uri = Uri.parse('$baseUrl/requests/$requestId');
+
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint('📥 DELETE Response status: ${response.statusCode}');
+      debugPrint('📥 DELETE Response body: ${response.body}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (response.body.isEmpty) {
+          return {'success': true};
+        }
+        try {
+          return jsonDecode(response.body);
+        } catch (e) {
+          return {'success': true};
+        }
+      } else if (response.statusCode == 204) {
+        // No content - success
+        return {'success': true};
+      } else {
+        throw Exception('Delete failed with status ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('❌ Delete request error: $e');
+      rethrow;
+    }
+  }
+
+// Delete request by query (matches GenericController.DeleteByQuery)
+  static Future<Map<String, dynamic>> deleteRequestsByQuery(Map<String, String> queryParams) async {
+    try {
+      final queryString = queryParams.entries
+          .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+      final endpoint = '/requests?$queryString';
+      debugPrint('📤 DELETE by query: $endpoint');
+      final response = await delete(endpoint);
+      return {'success': true, 'data': response};
+    } catch (e) {
+      debugPrint('❌ Delete by query error: $e');
+      rethrow;
+    }
+  }
   // ============================================================
   // APPOINTMENT ENDPOINTS
   // ============================================================
@@ -699,6 +1055,54 @@ class ApiService {
     } catch (e) {
       debugPrint('❌ Upload error: $e');
       rethrow;
+    }
+  }
+  // Add this diagnostic method to ApiService class
+  // Add this diagnostic method to ApiService class
+  static Future<void> testCreateRequest() async {
+    debugPrint('========== DIAGNOSTIC TEST ==========');
+
+    // Test 1: Check if server is reachable
+    try {
+      final uri = Uri.parse('$baseUrl/requests');
+      debugPrint('Test 1: Checking server at $uri');
+
+      final token = await StorageService.getToken();
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      final response = await http.get(
+        uri,
+        headers: headers,
+      ).timeout(const Duration(seconds: 5));
+
+      debugPrint('Server response status: ${response.statusCode}');
+      debugPrint('Server response body: ${response.body}');
+    } catch (e) {
+      debugPrint('Server not reachable: $e');
+    }
+
+    // Test 2: Check token
+    final token = await StorageService.getToken();
+    debugPrint('Test 2: Token exists: ${token != null}');
+    if (token != null) {
+      debugPrint('Token preview: ${token.substring(0, token.length > 20 ? 20 : token.length)}...');
+    }
+
+    // Test 3: Check user data
+    final userJson = await StorageService.getUser();
+    debugPrint('Test 3: User data exists: ${userJson != null}');
+    if (userJson != null) {
+      try {
+        // FIXED: Don't redeclare, just use userJson directly since it's already a Map
+        debugPrint('User fields: ${userJson.keys}');
+        debugPrint('User id fields: id=${userJson['id']}, ID=${userJson['ID']}, clientId=${userJson['clientId']}, ClientID=${userJson['ClientID']}');
+      } catch (e) {
+        debugPrint('Error parsing user JSON: $e');
+      }
     }
   }
 }

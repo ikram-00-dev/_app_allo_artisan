@@ -1,3 +1,4 @@
+import 'package:allo_artisan_gpt/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -9,6 +10,9 @@ import 'package:allo_artisan_gpt/core/widgets/restricted_access_card.dart'; // A
 import '../../controllers/request_controller.dart';
 import 'package:allo_artisan_gpt/controllers/post_controller.dart';
 import 'package:allo_artisan_gpt/models/post.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:allo_artisan_gpt/services/storage_service.dart';
 
 
 class ClientHomeScreen extends StatefulWidget {
@@ -21,17 +25,25 @@ class ClientHomeScreen extends StatefulWidget {
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
   final AuthController authController = Get.find<AuthController>();
   final PostController postController = Get.put(PostController());
+  File? _selectedImage;
+  final ImagePicker _imagePicker = ImagePicker();
 
   bool isUrgent = false;
   bool _showLoginModal = false;
   bool _showRequestModal = false;
-  String _selectedCategory = 'Plomberie';
+  String _selectedCategory = 'Plombier';
   String _requestZone = '';
   String _requestDescription = '';
   final RequestController requestController = Get.put(RequestController());
   bool _isSubmitting = false;
 
-
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _debugCheckUserData();
+    });
+  }
 
   final Set<String> likedPosts = {};
 
@@ -132,7 +144,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 
   // Replace the existing _handleSubmitRequest method with this:
-  // Replace the _handleSubmitRequest method in client_home_screen.dart
+  // Replace the _handleSubmitRequest method in client_home_screen.dart with this:
+
   void _handleSubmitRequest() async {
     // Validation
     if (_selectedCategory.isEmpty) {
@@ -153,17 +166,13 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       return;
     }
 
-    // Get current user ID
-    final user = authController.user.value;
-    final clientId = user?['id'] ?? user?['clientId'] ?? user?['ID'];
-
     // Use real location (you can add Geolocator later)
     double latitude = 33.5731;
     double longitude = -7.5898;
 
     setState(() => _isSubmitting = true);
 
-    // Submit using RequestController
+    // Submit using RequestController - REMOVED clientId parameter
     final success = await requestController.createRequest(
       description: _requestDescription,
       category: _selectedCategory,
@@ -171,7 +180,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       longitude: longitude,
       isUrgent: isUrgent,
       zoneKm: isUrgent ? int.tryParse(_requestZone) : null,
-      clientId: clientId,
+      // clientId is now handled inside the controller
     );
 
     setState(() => _isSubmitting = false);
@@ -182,7 +191,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         _showRequestModal = false;
         _requestZone = '';
         _requestDescription = '';
-        _selectedCategory = 'Plomberie';
+        _selectedCategory = 'Plombier'; // Updated default
         isUrgent = false;
       });
 
@@ -262,6 +271,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         _showRestrictedCard();
                       } else {
                         setState(() => _showRequestModal = true);
+                        _diagnoseRequestIssue(); // Add this line
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -788,22 +798,30 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Category (Obligatory)
+                    // Category Dropdown (Updated with professional categories)
                     DropdownButtonFormField<String>(
                       value: _selectedCategory,
                       decoration: const InputDecoration(
                         labelText: 'Catégorie *',
                         border: OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'Plomberie', child: Text('🔧 Plomberie')),
-                        DropdownMenuItem(value: 'Électricité', child: Text('⚡ Électricité')),
-                        DropdownMenuItem(value: 'Menuiserie', child: Text('🪚 Menuiserie')),
-                        DropdownMenuItem(value: 'Peinture', child: Text('🎨 Peinture')),
-                        DropdownMenuItem(value: 'Maçonnerie', child: Text('🧱 Maçonnerie')),
-                        DropdownMenuItem(value: 'Jardinage', child: Text('🌿 Jardinage')),
-                      ],
-                      onChanged: (value) => setState(() => _selectedCategory = value!),
+                      items: requestController.categories.map((String category) {
+                        return DropdownMenuItem<String>(
+                          value: category,
+                          child: Text(category),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _selectedCategory = value);
+                        }
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez choisir une catégorie';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -840,8 +858,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     const SizedBox(height: 20),
 
                     // ==================== IMAGE UPLOAD (LAST POSITION) ====================
+                    // Image Upload Section
                     GestureDetector(
-                      onTap: () => Get.snackbar("Info", "Fonctionnalité d'upload d'image bientôt disponible"),
+                      onTap: _pickImage,
                       child: Container(
                         height: 130,
                         decoration: BoxDecoration(
@@ -849,13 +868,40 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                           borderRadius: BorderRadius.circular(12),
                           color: Colors.grey.shade50,
                         ),
-                        child: const Center(
+                        child: _selectedImage != null
+                            ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                _selectedImage!,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: GestureDetector(
+                                onTap: _removeSelectedImage,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                            : const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.add_photo_alternate, size: 40, color: Colors.black54),
                               SizedBox(height: 8),
-                              Text("Ajouter une photo (optionnel)", style: TextStyle(color: Colors.black54)),
+                              Text("Ajouter une photo", style: TextStyle(color: Colors.black54)),
                               Text("JPG, PNG - Max 5MB", style: TextStyle(fontSize: 12, color: Colors.grey)),
                             ],
                           ),
@@ -910,6 +956,30 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         ),
       ),
     );
+  }
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+    }
+  }
+
+  void _removeSelectedImage() {
+    setState(() {
+      _selectedImage = null;
+    });
   }
 
 
@@ -1024,4 +1094,32 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       ),
     );
   }
+  // In client_home_screen.dart, add this method:
+
+  void _diagnoseRequestIssue() async {
+    print('Running diagnostic...');
+    await ApiService.testCreateRequest();
+  }
+  void _debugCheckUserData() {
+    final authController = Get.find<AuthController>();
+    final user = authController.user.value;
+
+    print('========== DEBUG USER DATA ==========');
+    print('User object: $user');
+    print('User keys: ${user?.keys}');
+    print('id field: ${user?['id']}');
+    print('ID field: ${user?['ID']}');
+    print('clientId field: ${user?['clientId']}');
+    print('isLoggedIn: ${authController.isLoggedIn}');
+    print('role: ${authController.role.value}');
+    print('token exists: ${authController.token.value.isNotEmpty}');
+
+    // Check storage directly
+    StorageService.getUser().then((storedUser) {
+      print('Stored user from SharedPreferences: $storedUser');
+      print('Stored user id: ${storedUser?['id']}');
+    });
+  }
+
+
 }
