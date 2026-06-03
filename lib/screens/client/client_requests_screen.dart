@@ -168,14 +168,27 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
   }
 
   String _formatDateSafe(DateTime? date) {
-    if (date == null) return 'Date inconnue';
+    if (date == null) {
+      // If createdAt is null, use requestDate as fallback
+      if (_editingRequest?.requestDate != null) {
+        return _formatDateSafe(_editingRequest?.requestDate);
+      }
+      return 'Date inconnue';
+    }
+
     final now = DateTime.now();
     final difference = now.difference(date);
 
     // Prevent negative days (future dates)
-    if (difference.inDays < 0) return 'Date future';
+    if (difference.inDays < 0) {
+      // Try to use requestDate if available
+      if (_editingRequest?.requestDate != null && _editingRequest!.requestDate.isBefore(now)) {
+        return _formatDateSafe(_editingRequest?.requestDate);
+      }
+      return 'Date future';
+    }
 
-    if (difference.inDays > 365) {
+    if (difference.inDays > 30) {
       return '${date.day}/${date.month}/${date.year}';
     } else if (difference.inDays > 0) {
       return 'Il y a ${difference.inDays} jour${difference.inDays > 1 ? 's' : ''}';

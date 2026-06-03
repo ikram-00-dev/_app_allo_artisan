@@ -806,6 +806,7 @@ class ApiService {
       if (data.containsKey('status')) {
         updateData['status'] = data['status'];
       }
+      // IMPORTANT: Send zoneKm, not zone_km (the JSON field name)
       if (data.containsKey('zoneKm')) {
         updateData['zoneKm'] = data['zoneKm'];
       }
@@ -819,20 +820,26 @@ class ApiService {
         return {'success': true, 'message': 'No changes provided'};
       }
 
+      debugPrint('📤 Updating request $id with data: $updateData');
+
       final token = await StorageService.getToken();
       final response = await http.put(
         Uri.parse('$baseUrl/requests/$id'),
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',
         },
         body: jsonEncode(updateData),
-      );
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint('📥 PUT Response status: ${response.statusCode}');
+      debugPrint('📥 PUT Response body: ${response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return response.body.isNotEmpty ? jsonDecode(response.body) : {'success': true};
       } else {
-        throw Exception('Update failed: ${response.statusCode}');
+        throw Exception('Update failed: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       debugPrint('Update error: $e');
@@ -920,45 +927,15 @@ class ApiService {
   static Future<void> markNotificationAsRead(int id) async {
     await put('/notifications/$id', {'isRead': true});
   }
-  // Add this method to ApiService class
-  static Future<Map<String, dynamic>> uploadFile(String endpoint, String filePath) async {
-    try {
-      final uri = Uri.parse('$baseUrl$endpoint');
-      final request = http.MultipartRequest('POST', uri);
-
-      final file = await http.MultipartFile.fromPath('file', filePath);
-      request.files.add(file);
-
-      final token = await StorageService.getToken();
-      if (token != null && token.isNotEmpty) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
-
-      request.headers['Accept'] = 'application/json';
-
-      debugPrint('📤 Uploading file to: $uri');
-
-      final response = await request.send().timeout(const Duration(seconds: 30));
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return jsonDecode(responseBody);
-      } else {
-        throw Exception('Upload failed: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('❌ Upload error: $e');
-      rethrow;
-    }
-  }
 
   // ============================================================
-  // FILE UPLOAD ENDPOINTS
+  // FILE UPLOAD ENDPOINTS - UNIFIED
   // ============================================================
 
+  /// Upload a file and get back the filename
+  /// Returns the filename (not full URL)
   static Future<String> uploadImage(String filePath) async {
     try {
-      // CORRECT ENDPOINT from routes.go
       final uri = Uri.parse('$baseUrl/files/upload');
       final request = http.MultipartRequest('POST', uri);
 
@@ -970,20 +947,49 @@ class ApiService {
         request.headers['Authorization'] = 'Bearer $token';
       }
 
+      debugPrint('📤 Uploading image to: $uri');
+
       final response = await request.send().timeout(const Duration(seconds: 30));
       final responseBody = await response.stream.bytesToString();
 
-      debugPrint('Upload response: $responseBody');
+      debugPrint('📥 Upload response: $responseBody');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(responseBody);
-        // Return the URL or file path
-        return decoded['url'] ?? decoded['file'] ?? '';
+        // Backend returns: {"status":"ok","file":"filename.ext","url":"http://localhost:8081/uploads/filename.ext"}
+        final filename = decoded['file'] ?? decoded['url'] ?? '';
+        debugPrint('✅ File uploaded: $filename');
+        return filename;
       } else {
         throw Exception('Upload failed: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Upload error: $e');
+      debugPrint('❌ Upload error: $e');
+      rethrow;
+    }
+  }
+
+  /// Get the full download URL for a file
+  static String getFileUrl(String filename) {
+    if (filename.isEmpty) return '';
+    // If it's already a full URL, return as-is
+    if (filename.startsWith('http')) return filename;
+    // Otherwise construct the URL
+    return 'http://192.168.1.36:8081/uploads/$filename';
+  }
+
+  /// Legacy method - delegates to uploadImage for backward compatibility
+  static Future<Map<String, dynamic>> uploadFile(String endpoint, String filePath) async {
+    try {
+      final filename = await uploadImage(filePath);
+      final url = getFileUrl(filename);
+      return {
+        'status': 'ok',
+        'file': filename,
+        'url': url,
+      };
+    } catch (e) {
+      debugPrint('❌ Upload file error: $e');
       rethrow;
     }
   }

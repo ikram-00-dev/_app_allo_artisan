@@ -61,6 +61,12 @@ class RequestModel {
   });
 
   factory RequestModel.fromJson(Map<String, dynamic> json) {
+    // Prioritize createdAt, fallback to requestDate
+    DateTime? createdAtValue = _parseDateTime(json['createdAt']);
+    if (createdAtValue == DateTime.now() && json['requestDate'] != null) {
+      createdAtValue = _parseDateTime(json['requestDate']);
+    }
+
     return RequestModel(
       idRequest: json['idRequest'],
       requestDate: _parseDateTime(json['requestDate']),
@@ -74,7 +80,7 @@ class RequestModel {
       priorityLevel: json['priorityLevel'],
       imageUrl: json['imageUrl'],
       zoneKm: json['zoneKm'],
-      createdAt: _parseDateTime(json['createdAt']),
+      createdAt: createdAtValue,
       updatedAt: _parseDateTime(json['updatedAt']),
     );
   }
