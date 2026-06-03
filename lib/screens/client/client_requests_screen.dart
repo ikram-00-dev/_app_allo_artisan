@@ -47,25 +47,17 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
     }
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'active': return Colors.green;
-      case 'accepted': return Colors.blue;
-      case 'pending': return Colors.orange;
-      case 'declined': case 'cancelled': return Colors.red;
-      default: return Colors.grey;
+  // Update the status methods - SIMPLIFIED
+  String _getStatusLabel(String status, bool isActive) {
+    if (isActive) {
+      return 'ACTIVE';
+    } else {
+      return 'INACTIVE';
     }
   }
 
-  String _getStatusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case 'active': return 'ACTIF';
-      case 'accepted': return 'ACCEPTÉ';
-      case 'pending': return 'EN ATTENTE';
-      case 'declined': return 'REFUSÉ';
-      case 'cancelled': return 'ANNULÉ';
-      default: return status.toUpperCase();
-    }
+  Color _getStatusColor(bool isActive) {
+    return isActive ? Colors.green : Colors.red;
   }
 
   Future<void> _deleteRequest(int id) async {
@@ -176,16 +168,21 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
   }
 
   String _formatDateSafe(DateTime? date) {
-    if (date == null) return 'Récemment';
+    if (date == null) return 'Date inconnue';
     final now = DateTime.now();
-    final diff = now.difference(date);
+    final difference = now.difference(date);
 
-    if (diff.inDays > 0) {
-      return 'Il y a ${diff.inDays} jour${diff.inDays > 1 ? 's' : ''}';
-    } else if (diff.inHours > 0) {
-      return 'Il y a ${diff.inHours} heure${diff.inHours > 1 ? 's' : ''}';
-    } else if (diff.inMinutes > 0) {
-      return 'Il y a ${diff.inMinutes} minute${diff.inMinutes > 1 ? 's' : ''}';
+    // Prevent negative days (future dates)
+    if (difference.inDays < 0) return 'Date future';
+
+    if (difference.inDays > 365) {
+      return '${date.day}/${date.month}/${date.year}';
+    } else if (difference.inDays > 0) {
+      return 'Il y a ${difference.inDays} jour${difference.inDays > 1 ? 's' : ''}';
+    } else if (difference.inHours > 0) {
+      return 'Il y a ${difference.inHours} heure${difference.inHours > 1 ? 's' : ''}';
+    } else if (difference.inMinutes > 0) {
+      return 'Il y a ${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''}';
     } else {
       return 'À l\'instant';
     }
@@ -301,17 +298,13 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: req.isExpired && status.toLowerCase() != 'accepted'
-                                      ? Colors.grey.withOpacity(0.1)
-                                      : _getStatusColor(status).withOpacity(0.1),
+                                  color: req.isActive ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  req.isExpired && status.toLowerCase() != 'accepted' ? 'EXPIRÉE' : _getStatusLabel(status),
+                                  req.displayStatus,
                                   style: TextStyle(
-                                    color: req.isExpired && status.toLowerCase() != 'accepted'
-                                        ? Colors.grey
-                                        : _getStatusColor(status),
+                                    color: req.displayStatusColor,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
@@ -374,14 +367,15 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                               const SizedBox(height: 12),
 
                               // Zone + Time - FIXED
+                              // Zone + Time - FIXED to only show zone if > 0
                               Row(
                                 children: [
                                   if (req.zoneKm != null && req.zoneKm! > 0) ...[
-                                    const Icon(Icons.location_on, size: 14, color: Color(0xFFBDBDBD)) ,// shade400 hex
+                                    const Icon(Icons.location_on, size: 14,color: Color(0xFF9CA3AF)),
                                     const SizedBox(width: 4),
                                     Text(
                                       '${req.zoneKm} km',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                      style: TextStyle(fontSize: 12, color: Colors.black87),
                                     ),
                                     const SizedBox(width: 12),
                                   ],
@@ -389,7 +383,7 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                                   const SizedBox(width: 4),
                                   Text(
                                     _formatDateSafe(req.createdAt),
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                    style: TextStyle(fontSize: 12, color: Colors.black87),
                                   ),
                                 ],
                               ),
@@ -435,7 +429,7 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                           child: Row(
                             children: [
                               // Edit button - only show if not expired OR if accepted
-                              if (!req.isExpired || status.toLowerCase() == 'accepted')
+                              if (req.isActive)
                                 Expanded(
                                   child: OutlinedButton.icon(
                                     onPressed: () => _openEditModal(req),
@@ -466,8 +460,7 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                                 ),
 
                               // Add spacing if both buttons are visible
-                              if (req.canBeActivated && (!req.isExpired || status.toLowerCase() == 'accepted'))
-                                const SizedBox(width: 12),
+                              if (req.canBeActivated)                                const SizedBox(width: 12),
 
                               // Delete button - always show
                               Expanded(
@@ -504,6 +497,7 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
     );
   }
 
+  // Replace the _buildEditModal method in client_requests_screen.dart
   Widget _buildEditModal() {
     if (!_showEditModal || _editingRequest == null) return const SizedBox.shrink();
 
@@ -518,167 +512,161 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
         child: Material(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          child: SingleChildScrollView(  // ← FIX OVERFLOW
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Blue icon container
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.edit_note, color: Colors.blue.shade700, size: 22),
                       ),
-                      child: Icon(Icons.edit_note, color: Colors.blue.shade700, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    // Title and urgency
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Modifier la demande',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _editingRequest!.isUrgent ? 'Demande urgente (type non modifiable)' : 'Demande normale (type non modifiable)',
+                              style: TextStyle(fontSize: 12, color: _editingRequest!.isUrgent ? Colors.red.shade600 : Colors.blue.shade600),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _showEditModal = false),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.close, size: 18, color: Colors.grey.shade600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Body content
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: Column(
+                    children: [
+                      _buildImageSection(),
+                      const SizedBox(height: 16),
+
+                      // Category
+                      _buildDropdownCategory(),
+                      const SizedBox(height: 12),
+
+                      // Zone field (editable for both types, but only relevant for urgent)
+                      // Zone field - FIXED to handle null value properly
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonFormField<int>(
+                          value: _editZone.isNotEmpty && int.tryParse(_editZone) != null
+                              ? int.tryParse(_editZone)
+                              : null,  // Use null instead of 0 when no value
+                          isExpanded: true,
+                          hint: const Text('Sélectionner une zone (km)'),
+                          decoration: const InputDecoration(
+                            hintText: 'Zone de recherche (km)',
+                            labelText: 'Zone (km)',
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            border: InputBorder.none,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 5, child: Text('5 km')),
+                            DropdownMenuItem(value: 10, child: Text('10 km')),
+                            DropdownMenuItem(value: 20, child: Text('20 km')),
+                            DropdownMenuItem(value: 30, child: Text('30 km')),
+                            DropdownMenuItem(value: 40, child: Text('40 km')),
+                            DropdownMenuItem(value: 50, child: Text('50 km')),
+                          ],
+                          onChanged: (value) => setState(() => _editZone = value?.toString() ?? ''),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Description
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: TextField(
+                          controller: _editDescriptionController,
+                          onChanged: (value) => _editDescription = value,
+                          maxLines: 5,
+                          decoration: const InputDecoration(
+                            hintText: 'Description de votre besoin...',
+                            contentPadding: EdgeInsets.all(16),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Buttons
+                      Row(
                         children: [
-                          const Text(
-                            'Modifier la demande',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF111827),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => setState(() => _showEditModal = false),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                side: BorderSide(color: Colors.grey.shade400, width: 1),
+                              ),
+                              child: const Text('Annuler', style: TextStyle(color: Color(0xFF374151), fontSize: 14)),
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _editingRequest!.isUrgent ? 'Demande urgente' : 'Demande normale',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _editingRequest!.isUrgent ? Colors.red.shade600 : Colors.blue.shade600,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _isEditSubmitting ? null : _handleEditSubmit,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2563EB),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: _isEditSubmitting
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Text('Enregistrer', style: TextStyle(color: Colors.white, fontSize: 14)),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    // Close button
-                    GestureDetector(
-                      onTap: () => setState(() => _showEditModal = false),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(Icons.close, size: 18, color: Colors.grey.shade600),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-
-              // Body content
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Column(
-                  children: [
-                    _buildImageSection(),
-
-                    const SizedBox(height: 16),
-
-                    // Category
-                    _buildDropdownCategory(),
-
-                    const SizedBox(height: 12),
-
-                    // Urgency Toggle + Zone (NEW)
-                    _buildUrgencyAndZone(),
-
-                    const SizedBox(height: 12),
-
-                    // Description - FIXED
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: TextField(
-                        controller: _editDescriptionController..text = _editDescription,
-                        onChanged: (value) => _editDescription = value,
-                        maxLines: 5,
-                        decoration: const InputDecoration(
-                          hintText: 'Description de votre besoin...',
-                          contentPadding: EdgeInsets.all(16),
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => setState(() => _showEditModal = false),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              side: BorderSide(color: Colors.grey.shade400, width: 1),
-                            ),
-                            child: const Text(
-                              'Annuler',
-                              style: TextStyle(
-                                color: Color(0xFF374151),
-                                fontSize: 14,
-                                fontWeight: FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _isEditSubmitting ? null : _handleEditSubmit,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: _isEditSubmitting
-                                ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                                : const Text(
-                              'Enregistrer',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+// Remove the _buildUrgencyAndZone method entirely since we're not using the type toggle
 
   Widget _buildImageSection() {
     final hasExistingImage = _editingRequest?.imageUrl != null &&
@@ -895,46 +883,5 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
     );
   }
 
-  Widget _buildUrgencyAndZone() {
-    return Column(
-      children: [
-        // Urgency Switch
-        SwitchListTile(
-          title: const Text('Demande urgente'),
-          value: _editIsUrgent,
-          activeColor: Colors.red,
-          onChanged: (val) {
-            setState(() {
-              _editIsUrgent = val;
-              if (!val) _editZone = '';
-            });
-          },
-        ),
 
-        // Zone Dropdown - now dynamic
-        if (_editIsUrgent)
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButtonFormField<int>(
-                value: _editZone.isEmpty ? null : int.tryParse(_editZone),
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  hintText: 'Rayon de recherche (km)',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  border: InputBorder.none,
-                ),
-                items: const [5, 10, 20, 30, 40, 50]
-                    .map((km) => DropdownMenuItem(value: km, child: Text('$km km')))
-                    .toList(),
-                onChanged: (value) => setState(() => _editZone = value?.toString() ?? ''),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
 }

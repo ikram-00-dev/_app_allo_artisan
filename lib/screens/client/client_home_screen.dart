@@ -172,31 +172,50 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // Submit using RequestController - REMOVED clientId parameter
-    final success = await requestController.createRequest(
-      description: _requestDescription,
-      category: _selectedCategory,
-      latitude: latitude,
-      longitude: longitude,
-      isUrgent: isUrgent,
-      zoneKm: isUrgent ? int.tryParse(_requestZone) : null,
-      // clientId is now handled inside the controller
-    );
+    try {
+      // Submit using RequestController
+      final success = await requestController.createRequest(
+        description: _requestDescription,
+        category: _selectedCategory,
+        latitude: latitude,
+        longitude: longitude,
+        isUrgent: isUrgent,
+        zoneKm: isUrgent ? int.tryParse(_requestZone) : null,
+        imagePath: _selectedImage?.path, // Add this line to include the image
+      );
 
-    setState(() => _isSubmitting = false);
+      if (success) {
+        // Reset form and close modal
+        setState(() {
+          _showRequestModal = false;
+          _requestZone = '';
+          _requestDescription = '';
+          _selectedCategory = 'Plombier';
+          isUrgent = false;
+          _selectedImage = null;
+        });
 
-    if (success) {
-      // Reset form and close modal
-      setState(() {
-        _showRequestModal = false;
-        _requestZone = '';
-        _requestDescription = '';
-        _selectedCategory = 'Plombier'; // Updated default
-        isUrgent = false;
-      });
+        Get.snackbar(
+          'Succès',
+          'Votre demande a été envoyée avec succès!',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
 
-      // Navigate directly to requests screen after successful submission
-      Get.offAllNamed(AppRoutes.clientRequests);
+        // Navigate directly to requests screen after successful submission
+        Get.offAllNamed(AppRoutes.clientRequests);
+      }
+    } catch (e) {
+      debugPrint('Error submitting request: $e');
+      Get.snackbar(
+        'Erreur',
+        'Impossible de créer la demande: ${e.toString()}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      setState(() => _isSubmitting = false);
     }
   }
 
@@ -1094,10 +1113,21 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       ),
     );
   }
+
+
   // In client_home_screen.dart, add this method:
 
   void _diagnoseRequestIssue() async {
     print('Running diagnostic...');
+    // In client_home_screen.dart, before the actual API call
+    await ApiService.testRequestCreation({
+      'description': _requestDescription,
+      'type': isUrgent ? 'urgent' : 'simple',
+      'category': _selectedCategory,
+      'clientId': 28, // Use a known working client ID
+      'status': 'pending',
+      'requestDate': DateTime.now().toIso8601String(),
+    });
     await ApiService.testCreateRequest();
   }
   void _debugCheckUserData() {

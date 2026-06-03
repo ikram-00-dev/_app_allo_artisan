@@ -44,41 +44,61 @@ class RequestController extends GetxController {
   }
 
   // Load all requests (for explore feed)
+  // Load all requests (for explore feed)
   Future<void> loadAllRequests() async {
     try {
       isLoading.value = true;
+      debugPrint('🔄 Loading all requests...');
+
       final response = await ApiService.getRequests();
+      debugPrint('📦 Raw response from API: $response');
 
       final List<dynamic> responseData = response is List ? response : [];
-      final allRequests = responseData.map((json) => RequestModel.fromJson(json)).toList();
+      debugPrint('📊 Response data length: ${responseData.length}');
+
+      final allRequests = responseData.map((json) {
+        debugPrint('📝 Converting JSON to RequestModel: $json');
+        return RequestModel.fromJson(json);
+      }).toList();
+
+      debugPrint('✅ Converted ${allRequests.length} requests');
 
       requests.value = allRequests;
       urgentRequests.value = allRequests.where((r) => r.type == 'urgent').toList();
       normalRequests.value = allRequests.where((r) => r.type == 'simple').toList();
 
+      debugPrint('📊 Urgent: ${urgentRequests.length}, Normal: ${normalRequests.length}');
     } catch (e) {
-      print('Error loading requests: $e');
+      debugPrint('❌ Error loading requests: $e');
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Load client's own requests
+// Load client's own requests - FIXED
+  // Load client's own requests - FIXED with filter for valid data
   Future<void> loadMyRequests(int clientId) async {
     try {
       isLoading.value = true;
+      debugPrint('🔄 Loading requests for client ID: $clientId');
+
       final response = await ApiService.getRequests();
 
       final List<dynamic> responseData = response is List ? response : [];
+      debugPrint('📊 Total requests from API: ${responseData.length}');
+
       final allRequests = responseData
           .map((json) => RequestModel.fromJson(json))
-          .where((req) => req.clientId == clientId)
+          .where((req) =>
+      req.clientId == clientId &&
+          req.idRequest != null &&
+          req.description.isNotEmpty) // Filter out empty demands
           .toList();
 
       myRequests.value = allRequests;
-      print('Loaded ${myRequests.length} requests for client $clientId');
+      debugPrint('✅ Loaded ${myRequests.length} requests for client $clientId');
     } catch (e) {
-      print('Error loading my requests: $e');
+      debugPrint('❌ Error loading my requests: $e');
       myRequests.value = [];
     } finally {
       isLoading.value = false;

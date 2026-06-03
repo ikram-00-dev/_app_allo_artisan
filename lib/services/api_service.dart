@@ -544,20 +544,29 @@ class ApiService {
 // ============================================================
 
 // GET all requests (matches GenericController.GetAll)
+  // GET all requests - ADD DEBUG PRINT
   static Future<List<dynamic>> getRequests() async {
     try {
+      debugPrint('📤 GETTING REQUESTS from: /requests');
       final response = await get('/requests');
-      // Generic controller returns array directly
+
+      debugPrint('📥 GET REQUESTS response type: ${response.runtimeType}');
+      debugPrint('📥 GET REQUESTS response: $response');
+
       if (response is List) {
+        debugPrint('✅ Response is List with ${response.length} items');
         return response;
       }
-      // Handle wrapped response if any
-      if (response['data'] is List) {
+
+      if (response is Map && response['data'] is List) {
+        debugPrint('✅ Response has data array with ${response['data'].length} items');
         return response['data'];
       }
+
+      debugPrint('⚠️ Unexpected response format: $response');
       return [];
     } catch (e) {
-      debugPrint('Error getting requests: $e');
+      debugPrint('❌ Error getting requests: $e');
       return [];
     }
   }
@@ -716,173 +725,117 @@ class ApiService {
     }
   }*/
   // CREATE request - DEBUG VERSION
-  // CREATE request - FIXED VERSION for your Go backend
+  // CREATE request - FIXED VERSION matching Go backend JSON tags exactly
   static Future<Map<String, dynamic>> createRequest(Map<String, dynamic> data, {String? imagePath}) async {
-    debugPrint('========== CREATE REQUEST START ==========');
-    debugPrint('Input data received: $data');
+    debugPrint('========== CREATE REQUEST ==========');
 
     try {
-      // Get client ID
-      int? clientId = data['clientId'] ?? data['ClientID'];
-
+      int? clientId = data['clientId'];
       if (clientId == null) {
-        // Try to get from stored user
         final userJson = await StorageService.getUser();
-        if (userJson != null) {
-          clientId = userJson['id'] ?? userJson['ID'] ?? userJson['clientId'];
-          debugPrint('Retrieved clientId from storage: $clientId');
-        }
+        clientId = userJson?['id'] ?? userJson?['ID'];
       }
 
       if (clientId == null) {
-        throw Exception('Client ID not found. Please login again.');
+        throw Exception('Client ID not found');
       }
 
-      debugPrint('✅ Using clientId: $clientId');
-
-      // Upload image first if provided
-      String? imageUrl;
-      if (imagePath != null && imagePath.isNotEmpty) {
-        try {
-          imageUrl = await uploadRequestImage(imagePath);
-          debugPrint('✅ Image uploaded: $imageUrl');
-        } catch (e) {
-          debugPrint('⚠️ Warning: Could not upload image: $e');
-        }
+      String priorityLevel = data['priorityLevel'] ?? 'medium';
+      priorityLevel = priorityLevel.toLowerCase();
+      if (!['low', 'medium', 'high'].contains(priorityLevel)) {
+        priorityLevel = 'medium';
       }
 
-      // Build request body matching Go struct JSON tags
+      // Build request body - ADD ZONEKM
       final Map<String, dynamic> requestBody = {
         'description': data['description'] ?? '',
-        'type': data['type'] ?? 'simple',
         'category': data['category'] ?? '',
         'clientId': clientId,
-        'status': 'pending',  // Changed from 'active' to 'pending' to match your default
-        'requestDate': DateTime.now().toIso8601String(),
+        'latitude': data['latitude'] ?? 0.0,
+        'longitude': data['longitude'] ?? 0.0,
+        'isUrgent': data['type'] == 'urgent',
+        'priorityLevel': priorityLevel,
+        'zoneKm': data['zoneKm'] ?? 0, // ADD THIS
       };
 
-      // Add optional fields
-      if (data['latitude'] != null) {
-        requestBody['latitude'] = (data['latitude'] as num).toDouble();
-      }
+      debugPrint('Sending: ${jsonEncode(requestBody)}');
 
-      if (data['longitude'] != null) {
-        requestBody['longitude'] = (data['longitude'] as num).toDouble();
-      }
-
-      if (imageUrl != null && imageUrl.isNotEmpty) {
-        requestBody['imageUrl'] = imageUrl;
-      }
-
-      // Add zoneKm for urgent requests
-      if (data['zoneKm'] != null && data['zoneKm'] > 0) {
-        requestBody['zoneKm'] = data['zoneKm'];
-      }
-
-      // Add priority level for urgent requests
-      if (data['type'] == 'urgent') {
-        requestBody['priorityLevel'] = data['priorityLevel'] ?? 'High';
-      }
-
-      debugPrint('📤 Sending JSON: ${jsonEncode(requestBody)}');
-
-      // Send request
       final token = await StorageService.getToken();
-      final uri = Uri.parse('$baseUrl/requests');
-
       final response = await http.post(
-        uri,
+        Uri.parse('$baseUrl/requests'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (token != null) 'Authorization': 'Bearer $token',
         },
         body: jsonEncode(requestBody),
-      ).timeout(const Duration(seconds: 30));
+      );
 
-      debugPrint('📥 Response status: ${response.statusCode}');
-      debugPrint('📥 Response body: ${response.body}');
+      debugPrint('Response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (response.body.isEmpty) {
-          return {'success': true, 'message': 'Request created'};
-        }
         return jsonDecode(response.body);
       } else {
-        String errorMessage;
-        try {
-          final errorBody = jsonDecode(response.body);
-          errorMessage = errorBody['message'] ?? errorBody['error'] ?? 'Server error: ${response.statusCode}';
-        } catch (e) {
-          errorMessage = 'Server returned ${response.statusCode}: ${response.body}';
-        }
-        throw Exception(errorMessage);
+        throw Exception('Server error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Create request error: $e');
+      debugPrint('Error: $e');
       rethrow;
     }
   }
-
 // UPDATE request (matches GenericController.Update)
   static Future<Map<String, dynamic>> updateRequest(int id, Map<String, dynamic> data, {String? imagePath, bool removeImage = false}) async {
     try {
-      // Upload new image if provided
       String? imageUrl;
       if (imagePath != null && imagePath.isNotEmpty) {
         try {
-          imageUrl = await uploadRequestImage(imagePath);
-          debugPrint('✅ Image uploaded for update: $imageUrl');
+          imageUrl = await uploadImage(imagePath);
         } catch (e) {
-          debugPrint('⚠️ Warning: Could not upload image: $e');
+          debugPrint('Image upload failed: $e');
         }
       }
 
-      final goData = <String, dynamic>{};
+      final updateData = <String, dynamic>{};
 
-      // Only include fields that are provided (for partial update)
-      if (data.containsKey('description') || data.containsKey('Description')) {
-        goData['Description'] = data['description'] ?? data['Description'];
+      if (data.containsKey('description')) {
+        updateData['description'] = data['description'];
       }
-      if (data.containsKey('type') || data.containsKey('Type')) {
-        goData['Type'] = data['type'] ?? data['Type'];
+      if (data.containsKey('category')) {
+        updateData['category'] = data['category'];
       }
-      if (data.containsKey('category') || data.containsKey('Category')) {
-        goData['Category'] = data['category'] ?? data['Category'];
+      if (data.containsKey('status')) {
+        updateData['status'] = data['status'];
       }
-      if (data.containsKey('status') || data.containsKey('Status')) {
-        goData['Status'] = data['status'] ?? data['Status'];
-      }
-
-      // Handle image updates
-      if (removeImage) {
-        goData['imageUrl'] = '';
-      } else if (imageUrl != null && imageUrl.isNotEmpty) {
-        goData['imageUrl'] = imageUrl;
-      }
-
-      // Handle urgent request specific fields
       if (data.containsKey('zoneKm')) {
-        goData['ZoneKm'] = data['zoneKm'];
+        updateData['zoneKm'] = data['zoneKm'];
       }
-      if (data.containsKey('priorityLevel')) {
-        goData['PriorityLevel'] = data['priorityLevel'];
+      if (removeImage) {
+        updateData['imageUrl'] = '';
+      } else if (imageUrl != null && imageUrl.isNotEmpty) {
+        updateData['imageUrl'] = imageUrl;
       }
 
-      // Handle location updates
-      if (data.containsKey('latitude')) goData['Latitude'] = data['latitude'];
-      if (data.containsKey('longitude')) goData['Longitude'] = data['longitude'];
-
-      if (goData.isEmpty) {
-        debugPrint('⚠️ No data to update for request $id');
+      if (updateData.isEmpty) {
         return {'success': true, 'message': 'No changes provided'};
       }
 
-      debugPrint('📤 Updating request $id with data: $goData');
+      final token = await StorageService.getToken();
+      final response = await http.put(
+        Uri.parse('$baseUrl/requests/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(updateData),
+      );
 
-      return await put('/requests/$id', goData);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return response.body.isNotEmpty ? jsonDecode(response.body) : {'success': true};
+      } else {
+        throw Exception('Update failed: ${response.statusCode}');
+      }
     } catch (e) {
-      debugPrint('❌ Update request error: $e');
+      debugPrint('Update error: $e');
       rethrow;
     }
   }
@@ -1005,7 +958,8 @@ class ApiService {
 
   static Future<String> uploadImage(String filePath) async {
     try {
-      final uri = Uri.parse('$baseUrl/upload/image');
+      // CORRECT ENDPOINT from routes.go
+      final uri = Uri.parse('$baseUrl/files/upload');
       final request = http.MultipartRequest('POST', uri);
 
       final file = await http.MultipartFile.fromPath('file', filePath);
@@ -1016,85 +970,20 @@ class ApiService {
         request.headers['Authorization'] = 'Bearer $token';
       }
 
-      request.headers['Accept'] = 'application/json';
-
-      debugPrint('📤 Uploading image to: $uri');
-      debugPrint('📤 File: ${file.filename}');
-
       final response = await request.send().timeout(const Duration(seconds: 30));
       final responseBody = await response.stream.bytesToString();
 
-      debugPrint('📥 Upload response status: ${response.statusCode}');
-      debugPrint('📥 Upload response body: $responseBody');
+      debugPrint('Upload response: $responseBody');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(responseBody);
-
-        if (decoded['url'] != null) {
-          return decoded['url'];
-        } else if (decoded['fileUrl'] != null) {
-          return decoded['fileUrl'];
-        } else if (decoded['path'] != null) {
-          return decoded['path'];
-        } else {
-          throw Exception('No URL in response: $responseBody');
-        }
+        // Return the URL or file path
+        return decoded['url'] ?? decoded['file'] ?? '';
       } else {
-        if (response.statusCode == 401) {
-          throw Exception('Session expired. Please login again.');
-        }
-        throw Exception('Upload failed with status ${response.statusCode}: $responseBody');
+        throw Exception('Upload failed: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('❌ Upload error: $e');
-      rethrow;
-    }
-  }
-
-  static Future<String> uploadDocument(String filePath) async {
-    try {
-      final uri = Uri.parse('$baseUrl/upload/document');
-      final request = http.MultipartRequest('POST', uri);
-
-      final file = await http.MultipartFile.fromPath('file', filePath);
-      request.files.add(file);
-
-      final token = await StorageService.getToken();
-      if (token != null && token.isNotEmpty) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
-
-      request.headers['Accept'] = 'application/json';
-
-      debugPrint('📤 Uploading document to: $uri');
-      debugPrint('📤 File: ${file.filename}');
-
-      final response = await request.send().timeout(const Duration(seconds: 30));
-      final responseBody = await response.stream.bytesToString();
-
-      debugPrint('📥 Upload response status: ${response.statusCode}');
-      debugPrint('📥 Upload response body: $responseBody');
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(responseBody);
-
-        if (decoded['url'] != null) {
-          return decoded['url'];
-        } else if (decoded['fileUrl'] != null) {
-          return decoded['fileUrl'];
-        } else if (decoded['path'] != null) {
-          return decoded['path'];
-        } else {
-          throw Exception('No URL in response: $responseBody');
-        }
-      } else {
-        if (response.statusCode == 401) {
-          throw Exception('Session expired. Please login again.');
-        }
-        throw Exception('Upload failed with status ${response.statusCode}: $responseBody');
-      }
-    } catch (e) {
-      debugPrint('❌ Upload error: $e');
+      debugPrint('Upload error: $e');
       rethrow;
     }
   }
@@ -1145,5 +1034,40 @@ class ApiService {
         debugPrint('Error parsing user JSON: $e');
       }
     }
+  }
+  static Future<void> testRequestCreation(Map<String, dynamic> testData) async {
+    debugPrint('========== TESTING REQUEST CREATION ==========');
+
+    final token = await StorageService.getToken();
+    final uri = Uri.parse('$baseUrl/requests');
+
+    debugPrint('URL: $uri');
+    debugPrint('Token exists: ${token != null}');
+    debugPrint('Sending data: ${jsonEncode(testData)}');
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(testData),
+    );
+
+    debugPrint('Response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      debugPrint('ERROR: ${response.body}');
+    }
+  }
+  static Future<Map<String, dynamic>> reactivateRequest(int requestId) async {
+    // When reactivating, set status back to 'active' and update createdAt to now
+    final now = DateTime.now().toIso8601String();
+    return await updateRequest(requestId, {
+      'status': 'active',
+      'requestDate': now,  // Reset the date so it's not expired
+    });
   }
 }

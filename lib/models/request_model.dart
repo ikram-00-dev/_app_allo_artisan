@@ -1,4 +1,5 @@
-// lib/models/request_model.dart - Add zoneKm property
+// lib/models/request_model.dart - COMPLETE FIXED VERSION
+
 import 'package:flutter/material.dart';
 
 class RequestModel {
@@ -6,17 +7,22 @@ class RequestModel {
   final DateTime requestDate;
   final String status;
   final String description;
-  final String type; // 'simple' or 'urgent'
+  final String type;
   final String category;
   final int clientId;
   final double? latitude;
   final double? longitude;
-  final String? priorityLevel; // 'Low', 'Medium', 'High'
+  final String? priorityLevel;
   final String? imageUrl;
-  final int? zoneKm; // ADD THIS - for urgent requests distance
+  final int? zoneKm;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  // Add these methods to the RequestModel class
+
+  bool get isActive {
+    if (createdAt == null) return false;
+    final expiryTime = createdAt!.add(const Duration(hours: 72));
+    return DateTime.now().isBefore(expiryTime);
+  }
 
   bool get isExpired {
     if (createdAt == null) return false;
@@ -24,22 +30,17 @@ class RequestModel {
     return DateTime.now().isAfter(expiryTime);
   }
 
+  // ADD THIS MISSING GETTER
   bool get canBeActivated {
-    return isExpired && status.toLowerCase() != 'accepted';
+    return isExpired;
   }
 
   String get displayStatus {
-    if (isExpired && status.toLowerCase() != 'accepted') {
-      return 'EXPIRÉE';
-    }
-    return statusLabel;
+    return isActive ? 'ACTIVE' : 'INACTIVE';
   }
 
   Color get displayStatusColor {
-    if (isExpired && status.toLowerCase() != 'accepted') {
-      return Colors.grey;
-    }
-    return statusColor;
+    return isActive ? Colors.green : Colors.grey;
   }
 
   RequestModel({
@@ -54,31 +55,27 @@ class RequestModel {
     this.longitude,
     this.priorityLevel,
     this.imageUrl,
-    this.zoneKm, // ADD THIS
+    this.zoneKm,
     this.createdAt,
     this.updatedAt,
   });
 
-  // Factory to create from JSON (matches Go JSON tags)
   factory RequestModel.fromJson(Map<String, dynamic> json) {
-    // Backend returns 'imageUrl' field
-    String? imageUrl = json['imageUrl'] ?? json['ImageUrl'];
-
     return RequestModel(
-      idRequest: json['idRequest'] ?? json['IDRequest'],
-      requestDate: _parseDateTime(json['requestDate'] ?? json['RequestDate']),
-      status: json['status'] ?? json['Status'] ?? 'pending',
-      description: json['description'] ?? json['Description'] ?? '',
-      type: json['type'] ?? json['Type'] ?? 'simple',
-      category: json['category'] ?? json['Category'] ?? '',
-      clientId: json['clientId'] ?? json['ClientID'] ?? json['ClientId'] ?? 0,
-      latitude: (json['latitude'] ?? json['Latitude'])?.toDouble(),
-      longitude: (json['longitude'] ?? json['Longitude'])?.toDouble(),
-      priorityLevel: json['priorityLevel'] ?? json['PriorityLevel'],
-      imageUrl: imageUrl,
-      zoneKm: json['zoneKm'] ?? json['ZoneKm'],
-      createdAt: _parseDateTime(json['createdAt'] ?? json['CreatedAt']),
-      updatedAt: _parseDateTime(json['updatedAt'] ?? json['UpdatedAt']),
+      idRequest: json['idRequest'],
+      requestDate: _parseDateTime(json['requestDate']),
+      status: json['status'] ?? 'pending',
+      description: json['description'] ?? '',
+      type: json['type'] ?? (json['priorityLevel'] != null ? 'urgent' : 'simple'),
+      category: json['category'] ?? '',
+      clientId: json['clientId'] ?? 0,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      priorityLevel: json['priorityLevel'],
+      imageUrl: json['imageUrl'],
+      zoneKm: json['zoneKm'],
+      createdAt: _parseDateTime(json['createdAt']),
+      updatedAt: _parseDateTime(json['updatedAt']),
     );
   }
 
@@ -87,55 +84,20 @@ class RequestModel {
     if (value is DateTime) return value;
     if (value is String) {
       try {
-        return DateTime.parse(value);
+        // Handle ISO 8601 format with timezone
+        String dateStr = value;
+        // Replace Z with +00:00 for UTC
+        if (dateStr.endsWith('Z')) {
+          dateStr = dateStr.replaceAll('Z', '+00:00');
+        }
+        return DateTime.parse(dateStr).toLocal();
       } catch (e) {
+        debugPrint('Failed to parse date: $value, error: $e');
         return DateTime.now();
       }
     }
     return DateTime.now();
   }
 
-  // Convert to JSON for API requests (matches Go struct fields)
-  Map<String, dynamic> toJson() {
-    return {
-      if (idRequest != null) 'IDRequest': idRequest,
-      'RequestDate': requestDate.toIso8601String(),
-      'Status': status,
-      'Description': description,
-      'Type': type,
-      'Category': category,
-      'ClientID': clientId,
-      if (latitude != null) 'Latitude': latitude,
-      if (longitude != null) 'Longitude': longitude,
-      if (priorityLevel != null) 'PriorityLevel': priorityLevel,
-      if (imageUrl != null) 'imageUrl': imageUrl,
-      if (zoneKm != null) 'ZoneKm': zoneKm, // ADD THIS
-      if (createdAt != null) 'CreatedAt': createdAt!.toIso8601String(),
-      if (updatedAt != null) 'UpdatedAt': updatedAt!.toIso8601String(),
-    };
-  }
-
   bool get isUrgent => type == 'urgent';
-
-  String get statusLabel {
-    switch (status.toLowerCase()) {
-      case 'active': return 'ACTIF';
-      case 'accepted': return 'ACCEPTÉ';
-      case 'pending': return 'EN ATTENTE';
-      case 'declined': return 'REFUSÉ';
-      case 'cancelled': return 'ANNULÉ';
-      default: return status.toUpperCase();
-    }
-  }
-
-
-  Color get statusColor {
-    switch (status.toLowerCase()) {
-      case 'active': return Colors.green;
-      case 'accepted': return Colors.blue;
-      case 'pending': return Colors.orange;
-      case 'declined': case 'cancelled': return Colors.red;
-      default: return Colors.grey;
-    }
-  }
 }
