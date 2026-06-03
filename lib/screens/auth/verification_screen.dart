@@ -21,31 +21,27 @@ class VerificationScreen extends StatefulWidget {
 class _VerificationScreenState extends State<VerificationScreen> {
   final authController = Get.find<AuthController>();
 
-  final Map<String, String> _verificationCodes = {
-    'email': '',
-    'phone': '',
-  };
-
   bool _isLoading = false;
-  bool _isResending = false;
-  bool _requiresEmailVerification = false;
-  bool _requiresPhoneVerification = false;
 
   @override
   void initState() {
     super.initState();
-    _checkVerificationRequirements();
+    _debugPrintFormData();
   }
 
-  void _checkVerificationRequirements() {
-    // Check what needs verification
-    if (widget.formData['email'] != null && widget.formData['email'].toString().isNotEmpty) {
-      _requiresEmailVerification = true;
-    }
+  void _debugPrintFormData() {
+    debugPrint('========== VERIFICATION SCREEN DATA ==========');
+    debugPrint('isArtisan: ${widget.isArtisan}');
+    debugPrint('formData keys: ${widget.formData.keys}');
+    debugPrint('formData: ${widget.formData}');
 
-    if (widget.formData['phoneNumber'] != null && widget.formData['phoneNumber'].toString().isNotEmpty) {
-      _requiresPhoneVerification = true;
-    }
+    // Check critical fields
+    debugPrint('firstName: ${widget.formData['firstName']}');
+    debugPrint('lastName: ${widget.formData['lastName']}');
+    debugPrint('username: ${widget.formData['username']}');
+    debugPrint('email: ${widget.formData['email']}');
+    debugPrint('phoneNumber: ${widget.formData['phoneNumber']}');
+    debugPrint('password: ${widget.formData['password'] != null ? "***" : "MISSING"}');
   }
 
   Future<void> _verifyAndRegister() async {
@@ -53,42 +49,95 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
     try {
       if (widget.isArtisan) {
-        // For artisan, the account is already created via the registration
-        // Just navigate to waiting screen
-        Get.off(() => const WaitingScreen(isArtisan: true));
-      } else {
-        // Proceed with client registration
-        final success = await authController.registerClient(
-          firstName: widget.formData['firstName'],
-          lastName: widget.formData['lastName'],
-          username: widget.formData['username'],
-          email: widget.formData['email'],
-          phoneNumber: widget.formData['phoneNumber'],
-          password: widget.formData['password'],
-          avatarUrl: widget.formData['avatarUrl'],
+        // For artisan registration
+        debugPrint('📝 Registering artisan...');
+
+        final success = await authController.registerArtisan(
+          firstName: widget.formData['firstName']?.toString() ?? '',
+          middleName: widget.formData['middleName']?.toString(),
+          lastName: widget.formData['lastName']?.toString() ?? '',
+          username: widget.formData['username']?.toString() ?? '',
+          email: widget.formData['email']?.toString() ?? '',
+          phoneNumber: widget.formData['phoneNumber']?.toString() ?? '',
+          password: widget.formData['password']?.toString() ?? '',
+          category: widget.formData['category']?.toString() ?? '',
+          province: widget.formData['province']?.toString() ?? '',
+          city: widget.formData['city']?.toString() ?? '',
+          district: widget.formData['district']?.toString() ?? '',
+          avatarUrl: widget.formData['avatarUrl']?.toString(),
+          diplomaUrl: widget.formData['diplomaUrl']?.toString(),
+          officialDocUrl: widget.formData['officialDocUrl']?.toString(),
+          experience: widget.formData['experience'] != null
+              ? int.tryParse(widget.formData['experience'].toString())
+              : null,
         );
 
         if (success) {
-          // Registration and auto-login successful
-          Get.offAllNamed('/client-home');
+          debugPrint('✅ Artisan registration successful');
+          // Navigate to waiting screen for artisan
+          Get.off(() => const WaitingScreen(isArtisan: true));
+        }
+      } else {
+        // For client registration
+        debugPrint('📝 Registering client...');
+
+        // Ensure we have email or phone number
+        final email = widget.formData['email']?.toString() ?? '';
+        final phoneNumber = widget.formData['phoneNumber']?.toString() ?? '';
+
+        if (email.isEmpty && phoneNumber.isEmpty) {
+          _showError('Veuillez fournir un email ou un numéro de téléphone');
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        final success = await authController.registerClient(
+          firstName: widget.formData['firstName']?.toString() ?? '',
+          middleName: widget.formData['middleName']?.toString(),
+          lastName: widget.formData['lastName']?.toString() ?? '',
+          username: widget.formData['username']?.toString() ?? '',
+          email: email.isNotEmpty ? email : null,
+          phoneNumber: phoneNumber.isNotEmpty ? phoneNumber : null,
+          password: widget.formData['password']?.toString() ?? '',
+          avatarUrl: widget.formData['avatarUrl']?.toString(),
+        );
+
+        if (success) {
+          debugPrint('✅ Client registration successful');
+          // AuthController will handle navigation to client home
+        } else {
+          _showError('Échec de l\'inscription. Veuillez réessayer.');
         }
       }
     } catch (e) {
-      debugPrint('Registration error: $e');
+      debugPrint('❌ Registration error: $e');
       _showError('Erreur lors de l\'inscription: ${e.toString().replaceFirst('Exception: ', '')}');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   void _showError(String message) {
-    Get.snackbar("Erreur", message,
-        backgroundColor: Colors.red, colorText: Colors.white);
+    Get.snackbar(
+      "Erreur",
+      message,
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 4),
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   void _showSuccess(String message) {
-    Get.snackbar("Succès", message,
-        backgroundColor: Colors.green, colorText: Colors.white);
+    Get.snackbar(
+      "Succès",
+      message,
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+      snackPosition: SnackPosition.TOP,
+    );
   }
 
   @override
@@ -122,14 +171,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      widget.isArtisan ? Icons.assignment_turned_in : Icons.info_outline,
+                      widget.isArtisan ? Icons.assignment_turned_in : Icons.check_circle,
                       size: 48,
                       color: widget.isArtisan ? Colors.amber : Colors.green,
                     ),
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    widget.isArtisan ? 'Demande envoyée' : 'Vérification simplifiée',
+                    widget.isArtisan ? 'Demande envoyée' : 'Confirmation',
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -139,14 +188,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   const SizedBox(height: 16),
                   Text(
                     widget.isArtisan
-                        ? 'Votre demande d\'inscription a été enregistrée avec succès.'
-                        : 'Votre compte va être créé avec:',
+                        ? 'Votre demande d\'inscription a été enregistrée.'
+                        : 'Vérifiez vos informations avant validation:',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey.shade600,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
                   // Display info
                   Container(
@@ -158,6 +207,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     ),
                     child: Column(
                       children: [
+                        ListTile(
+                          leading: const Icon(Icons.person, color: Color(0xFF2563EB)),
+                          title: const Text('Nom complet'),
+                          subtitle: Text('${widget.formData['firstName']} ${widget.formData['lastName']}'),
+                        ),
                         if (widget.formData['email'] != null && widget.formData['email'].toString().isNotEmpty)
                           ListTile(
                             leading: const Icon(Icons.email, color: Color(0xFF2563EB)),
@@ -170,16 +224,17 @@ class _VerificationScreenState extends State<VerificationScreen> {
                             title: const Text('Téléphone'),
                             subtitle: Text(widget.formData['phoneNumber']),
                           ),
-                        ListTile(
-                          leading: const Icon(Icons.person, color: Color(0xFF2563EB)),
-                          title: const Text('Nom complet'),
-                          subtitle: Text('${widget.formData['firstName']} ${widget.formData['lastName']}'),
-                        ),
                         if (widget.isArtisan)
                           ListTile(
                             leading: const Icon(Icons.work, color: Color(0xFF2563EB)),
-                            title: const Text('Rôle'),
-                            subtitle: const Text('Artisan'),
+                            title: const Text('Catégorie'),
+                            subtitle: Text(widget.formData['category'] ?? ''),
+                          ),
+                        if (widget.isArtisan)
+                          ListTile(
+                            leading: const Icon(Icons.location_on, color: Color(0xFF2563EB)),
+                            title: const Text('Localisation'),
+                            subtitle: Text('${widget.formData['city']}, ${widget.formData['province']}'),
                           ),
                       ],
                     ),
@@ -187,33 +242,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
                   const SizedBox(height: 24),
 
-                  if (!widget.isArtisan)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info, color: Colors.blue.shade700, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Note: La vérification par code sera disponible prochainement. Pour l\'instant, votre compte sera créé immédiatement.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue.shade700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  if (!widget.isArtisan) const SizedBox(height: 24),
-
-                  // Create account button for client or Continue button for artisan
+                  // Create account button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _verifyAndRegister,
                     style: ElevatedButton.styleFrom(
@@ -234,7 +263,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       ),
                     )
                         : Text(
-                      widget.isArtisan ? 'Continuer' : 'Créer mon compte',
+                      widget.isArtisan ? 'Envoyer la demande' : 'Créer mon compte',
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                   ),

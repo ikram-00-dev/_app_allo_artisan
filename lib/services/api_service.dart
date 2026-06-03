@@ -203,6 +203,9 @@ class ApiService {
   // ============================================================
 
   static dynamic _handleResponse(http.Response response) {
+    debugPrint('Response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
+
     if (response.body.isEmpty) {
       debugPrint('❌ Empty response body');
       throw Exception('Empty response from server');
@@ -211,14 +214,15 @@ class ApiService {
     dynamic body;
     try {
       body = jsonDecode(response.body);
-      debugPrint('✅ JSON parsed successfully');
+      debugPrint('✅ JSON parsed successfully: $body');
     } catch (e) {
       debugPrint('❌ JSON Decode error: $e');
       debugPrint('❌ Raw response: ${response.body}');
-      throw Exception('Invalid JSON response from server');
+      throw Exception('Invalid JSON response from server: ${response.body}');
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      // For 201 Created, return the body directly
       return body;
     } else if (response.statusCode == 400) {
       final message = body['message'] ?? body['error'] ?? 'Bad request';
@@ -277,25 +281,30 @@ class ApiService {
   // AUTHENTICATION ENDPOINTS
   // ============================================================
 
+  // In api_service.dart, replace the login method with:
+
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
     required String role,
   }) async {
     debugPrint('🔐 Login to: $baseUrl/auth/login');
+    debugPrint('📤 Request body: {"email": "$email", "password": "***", "role": "$role"}');
 
     final response = await post('/auth/login', {
       'email': email,
       'password': password,
+      'role': role,  // ✅ Add role to request body
     });
 
-    debugPrint('✅ Login response received');
+    debugPrint('✅ Login response received: $response');
 
     if (response['token'] != null) {
       setToken(response['token']);
       debugPrint('✅ Token saved');
     } else {
       debugPrint('❌ No token in response');
+      throw Exception('No token received from server');
     }
 
     return response;
@@ -313,19 +322,23 @@ class ApiService {
   }) async {
     debugPrint('📝 Registering client to: $baseUrl/auth/register/client');
 
-    final response = await post('/auth/register/client', {
+    final Map<String, dynamic> requestBody = {
       'firstName': firstName,
       'middleName': middleName ?? '',
       'lastName': lastName,
       'username': username,
-      'email': email,
+      'email': email.trim(),
       'password': password,
       'phoneNumber': phoneNumber ?? '',
       'avatarUrl': avatarUrl ?? '',
-    });
+    };
 
-    debugPrint('✅ Client registered successfully');
-    return response;
+    debugPrint('Request body: ${jsonEncode(requestBody)}');
+
+    final response = await post('/auth/register/client', requestBody);
+
+    debugPrint('✅ Client registered successfully, response: $response');
+    return response as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> registerArtisan({
@@ -703,7 +716,6 @@ class ApiService {
     }
   }*/
   // CREATE request - DEBUG VERSION
-  // CREATE request - DEBUG VERSION (FIXED)
   // CREATE request - FIXED VERSION for your Go backend
   static Future<Map<String, dynamic>> createRequest(Map<String, dynamic> data, {String? imagePath}) async {
     debugPrint('========== CREATE REQUEST START ==========');
@@ -718,6 +730,7 @@ class ApiService {
         final userJson = await StorageService.getUser();
         if (userJson != null) {
           clientId = userJson['id'] ?? userJson['ID'] ?? userJson['clientId'];
+          debugPrint('Retrieved clientId from storage: $clientId');
         }
       }
 
@@ -727,27 +740,48 @@ class ApiService {
 
       debugPrint('✅ Using clientId: $clientId');
 
-      // Build request body matching Go struct JSON tags (lowercase)
+      // Upload image first if provided
+      String? imageUrl;
+      if (imagePath != null && imagePath.isNotEmpty) {
+        try {
+          imageUrl = await uploadRequestImage(imagePath);
+          debugPrint('✅ Image uploaded: $imageUrl');
+        } catch (e) {
+          debugPrint('⚠️ Warning: Could not upload image: $e');
+        }
+      }
+
+      // Build request body matching Go struct JSON tags
       final Map<String, dynamic> requestBody = {
-        'description': data['description'] ?? '',  // Matches json:"description"
-        'type': data['type'] ?? 'simple',          // Matches json:"type"
-        'category': data['category'] ?? '',        // Matches json:"category"
-        'clientId': clientId,                      // Matches json:"clientId"
-        'status': 'active',
+        'description': data['description'] ?? '',
+        'type': data['type'] ?? 'simple',
+        'category': data['category'] ?? '',
+        'clientId': clientId,
+        'status': 'pending',  // Changed from 'active' to 'pending' to match your default
+        'requestDate': DateTime.now().toIso8601String(),
       };
 
-      // Add optional fields with correct lowercase names
+      // Add optional fields
       if (data['latitude'] != null) {
-        requestBody['latitude'] = data['latitude'];
+        requestBody['latitude'] = (data['latitude'] as num).toDouble();
       }
 
       if (data['longitude'] != null) {
-        requestBody['longitude'] = data['longitude'];
+        requestBody['longitude'] = (data['longitude'] as num).toDouble();
       }
 
-      // Add zoneKm for urgent requests (matches json:"zoneKm")
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        requestBody['imageUrl'] = imageUrl;
+      }
+
+      // Add zoneKm for urgent requests
       if (data['zoneKm'] != null && data['zoneKm'] > 0) {
         requestBody['zoneKm'] = data['zoneKm'];
+      }
+
+      // Add priority level for urgent requests
+      if (data['type'] == 'urgent') {
+        requestBody['priorityLevel'] = data['priorityLevel'] ?? 'High';
       }
 
       debugPrint('📤 Sending JSON: ${jsonEncode(requestBody)}');
@@ -761,7 +795,7 @@ class ApiService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
         },
         body: jsonEncode(requestBody),
       ).timeout(const Duration(seconds: 30));
@@ -775,7 +809,14 @@ class ApiService {
         }
         return jsonDecode(response.body);
       } else {
-        throw Exception('Server returned ${response.statusCode}: ${response.body}');
+        String errorMessage;
+        try {
+          final errorBody = jsonDecode(response.body);
+          errorMessage = errorBody['message'] ?? errorBody['error'] ?? 'Server error: ${response.statusCode}';
+        } catch (e) {
+          errorMessage = 'Server returned ${response.statusCode}: ${response.body}';
+        }
+        throw Exception(errorMessage);
       }
     } catch (e) {
       debugPrint('❌ Create request error: $e');

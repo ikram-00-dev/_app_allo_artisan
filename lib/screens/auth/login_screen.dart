@@ -23,15 +23,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
-  String selectedRole = "clients"; // Default role
+  String selectedRole = "client"; // Default role
   bool obscurePassword = true;
   bool isLoading = false;
 
   String? _redirectRoute;
 
   final List<Map<String, dynamic>> roles = [
-    {'value': 'clients', 'label': 'Client', 'icon': Icons.person},
-    {'value': 'artisans', 'label': 'Artisan', 'icon': Icons.handyman},
+    {'value': 'client', 'label': 'Client', 'icon': Icons.person},
+    {'value': 'artisan', 'label': 'Artisan', 'icon': Icons.handyman},
   ];
 
   @override
