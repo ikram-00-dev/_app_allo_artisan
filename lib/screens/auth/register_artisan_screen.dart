@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../controllers/auth_controller.dart';
+import '../../services/api_service.dart';
 
 enum RegistrationStep { form, waiting }
 
@@ -83,7 +84,6 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-  // SIMULATED file picker - just simulates upload without actual upload
   Future<void> _pickProfileImage() async {
     try {
       final XFile? file = await _picker.pickImage(
@@ -93,20 +93,17 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
 
       if (file == null) return;
 
-      // Show loading state
       setState(() {
         _profileImageFile = File(file.path);
         _isUploadingProfileImage = true;
       });
 
-      // Simulate upload delay (like real upload)
-      await Future.delayed(const Duration(seconds: 1));
+      final uploadedUrl = await ApiService.uploadImage(file.path);
 
-      // Simulate successful upload
       setState(() {
         _hasProfileImage = true;
         _isUploadingProfileImage = false;
-        _formData['avatarUrl'] = 'simulated_avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        _formData['avatarUrl'] = uploadedUrl;
       });
 
       Get.snackbar(
@@ -119,9 +116,10 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
       );
     } catch (e) {
       setState(() => _isUploadingProfileImage = false);
+      debugPrint('Error uploading artisan profile image: $e');
       Get.snackbar(
         'Erreur',
-        'Erreur lors de la sélection',
+        'Impossible de télécharger la photo',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );

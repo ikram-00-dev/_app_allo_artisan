@@ -307,18 +307,25 @@ class RequestController extends GetxController {
   }
   // REACTIVATE REQUEST (make it active again)
   // REACTIVATE REQUEST
+  // In request_controller.dart
   Future<bool> reactivateRequest(int requestId) async {
     try {
       isLoading.value = true;
 
+      final now = DateTime.now().toIso8601String();
+
       final updateData = {
         'status': 'active',
+        'requestDate': now,      // ← Reset date
+        'createdAt': now,        // ← Reset createdAt so it appears first
       };
 
       await ApiService.updateRequest(requestId, updateData);
 
+      // Refresh lists
       final authController = Get.find<AuthController>();
       final int? clientId = authController.user.value?['id'] ?? authController.user.value?['clientId'];
+
       if (clientId != null) {
         await loadMyRequests(clientId);
       }
@@ -326,19 +333,14 @@ class RequestController extends GetxController {
 
       Get.snackbar(
         "Succès",
-        "Demande réactivée avec succès!",
+        "Demande réactivée avec succès! Elle apparaît maintenant en premier.",
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
       return true;
     } catch (e) {
       print('Error reactivating request: $e');
-      Get.snackbar(
-        "Erreur",
-        "Impossible de réactiver la demande: ${e.toString()}",
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      Get.snackbar("Erreur", "Impossible de réactiver la demande", backgroundColor: Colors.red, colorText: Colors.white);
       return false;
     } finally {
       isLoading.value = false;

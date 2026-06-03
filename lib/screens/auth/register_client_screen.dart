@@ -110,10 +110,10 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
 
     try {
       // Upload image to server using the unified endpoint
-      final filename = await ApiService.uploadImage(_profileImage!.path);
-      
-      if (filename.isNotEmpty) {
-        _uploadedImageUrl = filename;
+      final uploadedUrl = await ApiService.uploadImage(_profileImage!.path);
+
+      if (uploadedUrl.isNotEmpty) {
+        _uploadedImageUrl = uploadedUrl;
         Get.snackbar(
           "Succès",
           "Photo de profil téléchargée",

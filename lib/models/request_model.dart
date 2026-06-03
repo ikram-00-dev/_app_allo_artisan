@@ -79,7 +79,7 @@ class RequestModel {
       longitude: (json['longitude'] as num?)?.toDouble(),
       priorityLevel: json['priorityLevel'],
       imageUrl: json['imageUrl'],
-      zoneKm: json['zoneKm'],
+      zoneKm: json['zoneKm'] ?? json['zone_km'] ?? 0,
       createdAt: createdAtValue,
       updatedAt: _parseDateTime(json['updatedAt']),
     );

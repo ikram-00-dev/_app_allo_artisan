@@ -9,7 +9,7 @@ import '../../controllers/request_controller.dart';
 import '../../models/request_model.dart';
 import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
 import '../../routes/app_routes.dart';
-
+import '../../services/api_service.dart';
 class ClientRequestsScreen extends StatefulWidget {
   const ClientRequestsScreen({super.key});
 
@@ -88,7 +88,9 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
       _editCategory = request.category;
       _editDescription = request.description;
       _editIsUrgent = request.isUrgent;
-      _editZone = request.zoneKm?.toString() ?? '';
+      _editZone = (request.zoneKm != null && request.zoneKm! > 0)
+          ? request.zoneKm.toString()
+          : '';
       _editImage = null;
       _removeExistingImage = false;
       _showEditModal = true;
@@ -169,27 +171,19 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
 
   String _formatDateSafe(DateTime? date) {
     if (date == null) {
-      // If createdAt is null, use requestDate as fallback
-      if (_editingRequest?.requestDate != null) {
-        return _formatDateSafe(_editingRequest?.requestDate);
-      }
       return 'Date inconnue';
     }
 
     final now = DateTime.now();
     final difference = now.difference(date);
 
-    // Prevent negative days (future dates)
+    // Handle future dates (should not happen but safety)
     if (difference.inDays < 0) {
-      // Try to use requestDate if available
-      if (_editingRequest?.requestDate != null && _editingRequest!.requestDate.isBefore(now)) {
-        return _formatDateSafe(_editingRequest?.requestDate);
-      }
-      return 'Date future';
+      return 'À l\'instant';
     }
 
     if (difference.inDays > 30) {
-      return '${date.day}/${date.month}/${date.year}';
+      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     } else if (difference.inDays > 0) {
       return 'Il y a ${difference.inDays} jour${difference.inDays > 1 ? 's' : ''}';
     } else if (difference.inHours > 0) {
@@ -328,13 +322,14 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                         ),
 
                         // Image - FIXED
+                        // Image - IMPROVED VERSION
                         if (req.imageUrl != null && req.imageUrl!.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: Image.network(
-                                'http://192.168.1.36:8081${req.imageUrl!.startsWith('/') ? '' : '/'}${req.imageUrl!}',
+                                ApiService.getFileUrl(req.imageUrl!),   // ← This is the fix
                                 height: 200,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
@@ -342,7 +337,9 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                                   return Container(
                                     height: 200,
                                     color: Colors.grey.shade100,
-                                    child: const Center(child: Icon(Icons.broken_image, size: 40, color: Colors.grey)),
+                                    child: const Center(
+                                        child: Icon(Icons.broken_image, size: 40, color: Colors.grey)
+                                    ),
                                   );
                                 },
                                 loadingBuilder: (context, child, loadingProgress) {
@@ -529,7 +526,7 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
+                // Header (unchanged)
                 Container(
                   padding: const EdgeInsets.all(20),
                   child: Row(
@@ -554,7 +551,7 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _editingRequest!.isUrgent ? 'Demande urgente (type non modifiable)' : 'Demande normale (type non modifiable)',
+                              _editingRequest!.isUrgent ? 'Demande urgente' : 'Demande normale',
                               style: TextStyle(fontSize: 12, color: _editingRequest!.isUrgent ? Colors.red.shade600 : Colors.blue.shade600),
                             ),
                           ],
@@ -575,7 +572,7 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                   ),
                 ),
 
-                // Body content
+                // Body
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                   child: Column(
@@ -587,17 +584,14 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                       _buildDropdownCategory(),
                       const SizedBox(height: 12),
 
-                      // Zone field (editable for both types, but only relevant for urgent)
-                      // Zone field - FIXED to handle null value properly
+                      // === FIXED ZONE DROPDOWN ===
                       Container(
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.grey.shade300),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: DropdownButtonFormField<int>(
-                          value: _editZone.isNotEmpty && int.tryParse(_editZone) != null
-                              ? int.tryParse(_editZone)
-                              : null,  // Use null instead of 0 when no value
+                        child: DropdownButtonFormField<int?>(
+                          value: _getValidZoneValue(), // ← FIXED HERE
                           isExpanded: true,
                           hint: const Text('Sélectionner une zone (km)'),
                           decoration: const InputDecoration(
@@ -607,6 +601,7 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                             border: InputBorder.none,
                           ),
                           items: const [
+                            DropdownMenuItem(value: null, child: Text('Pas de zone spécifique')),
                             DropdownMenuItem(value: 5, child: Text('5 km')),
                             DropdownMenuItem(value: 10, child: Text('10 km')),
                             DropdownMenuItem(value: 20, child: Text('20 km')),
@@ -614,7 +609,11 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
                             DropdownMenuItem(value: 40, child: Text('40 km')),
                             DropdownMenuItem(value: 50, child: Text('50 km')),
                           ],
-                          onChanged: (value) => setState(() => _editZone = value?.toString() ?? ''),
+                          onChanged: (value) {
+                            setState(() {
+                              _editZone = value?.toString() ?? '';
+                            });
+                          },
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -677,6 +676,16 @@ class _ClientRequestsScreenState extends State<ClientRequestsScreen> {
         ),
       ),
     );
+  }
+  int? _getValidZoneValue() {
+    if (_editZone.isEmpty) return null;
+
+    final parsed = int.tryParse(_editZone);
+    if (parsed == null || parsed == 0) return null;
+
+    // Only return value if it's in the allowed list
+    const allowed = {5, 10, 20, 30, 40, 50};
+    return allowed.contains(parsed) ? parsed : null;
   }
 
 // Remove the _buildUrgencyAndZone method entirely since we're not using the type toggle
