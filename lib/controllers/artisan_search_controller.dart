@@ -31,11 +31,13 @@ class ArtisanSearchController extends GetxController {
 
       artisans.value = (response as List)
           .map((json) => Artisan.fromJson(json))
+          .where((artisan) => artisan.isActive) // Only show active artisans
           .toList();
     } catch (e) {
+      print('Error fetching artisans: $e');
       Get.snackbar(
         "Erreur",
-        "Impossible de charger les artisans: $e",
+        "Impossible de charger les artisans",
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -54,10 +56,20 @@ class ArtisanSearchController extends GetxController {
     fetchArtisans();
   }
 
+  void onSearchChanged() {
+    fetchArtisans();
+  }
+
   void resetFilters() {
     selectedCategory.value = 'all';
     minRating.value = 0.0;
     searchController.clear();
     fetchArtisans();
+  }
+
+  @override
+  void onClose() {
+    searchController.dispose();
+    super.onClose();
   }
 }

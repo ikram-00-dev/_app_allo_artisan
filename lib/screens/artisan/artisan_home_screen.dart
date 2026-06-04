@@ -21,36 +21,46 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   final RequestController requestController = Get.put(RequestController());
   bool isActiveMode = true;
 
-  // ============================================================
-  // 📝 MOCK DATA - Example posts to show design (only when no real data)
-  // ============================================================
-  final List<Map<String, dynamic>> mockNormalDemands = [
+  // These are for fallback ONLY - will be replaced by real data
+  final List<Map<String, dynamic>> _fallbackNormalDemands = [
     {
       'idRequest': 1,
       'clientId': 101,
-      'clientID': 101,
-      'name': 'Aymen Bousahah',
+      'name': 'Client Test',
       'time': 'Il y a 2 heures',
       'category': 'Plomberie',
       'location': 'Ghalma 12ème',
-      'description': 'Recherche plombier pour rénover une salle de bain complète. Projet prévu dans 2 semaines.',
+      'description': 'Recherche plombier pour rénover une salle de bain complète.',
       'isUrgent': false,
     },
   ];
 
-  final List<Map<String, dynamic>> mockUrgentDemands = [
+  final List<Map<String, dynamic>> _fallbackUrgentDemands = [
     {
       'idRequest': 2,
       'clientId': 102,
-      'clientID': 102,
-      'name': 'Sarah Benamama',
+      'name': 'Client Urgent',
       'time': 'Il y a 10 min',
       'category': 'Plomberie - Fuite d\'eau',
       'location': 'Alger 15ème',
-      'description': "Fuite d'eau importante dans la salle de bain, besoin d'intervention rapide!",
+      'description': "Fuite d'eau importante dans la salle de bain!",
       'isUrgent': true,
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load real data when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadRealRequests();
+    });
+  }
+
+  Future<void> _loadRealRequests() async {
+    await requestController.loadAllRequests();
+    setState(() {});
+  }
 
   void onNavBarTapped(int index) {
     switch (index) {
@@ -79,15 +89,13 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            await requestController.loadAllRequests();
+            await _loadRealRequests();
           },
           child: Obx(() {
-            // Show loading indicator only if no mock data and no real data
+            // Show loading indicator while fetching real data
             if (requestController.isLoading.value &&
                 requestController.urgentRequests.isEmpty &&
-                requestController.normalRequests.isEmpty &&
-                mockUrgentDemands.isEmpty &&
-                mockNormalDemands.isEmpty) {
+                requestController.normalRequests.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
 
@@ -180,21 +188,31 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   }
 
   // ============================================================
-  // 📰 Dynamic Demands Feed - FIXED for RequestModel
+  // 📰 Dynamic Demands Feed - LOADS REAL DATA
   // ============================================================
   Widget _buildDynamicDemandsFeed() {
-    // Convert RequestModel to Map for display (to keep existing card designs)
+    // Convert RequestModel to Map for display (keeping your exact design)
     final List<Map<String, dynamic>> realUrgentDemands =
     requestController.urgentRequests.map((req) => _requestModelToMap(req)).toList();
 
     final List<Map<String, dynamic>> realNormalDemands =
     requestController.normalRequests.map((req) => _requestModelToMap(req)).toList();
 
-    final hasRealUrgent = realUrgentDemands.isNotEmpty;
-    final hasRealNormal = realNormalDemands.isNotEmpty;
+    // Use real data if available, fallback to mock only if absolutely empty
+    final displayUrgentDemands = realUrgentDemands.isNotEmpty ? realUrgentDemands : _fallbackUrgentDemands;
+    final displayNormalDemands = realNormalDemands.isNotEmpty ? realNormalDemands : _fallbackNormalDemands;
 
-    final displayUrgentDemands = hasRealUrgent ? realUrgentDemands : mockUrgentDemands;
-    final displayNormalDemands = hasRealNormal ? realNormalDemands : mockNormalDemands;
+    // Filter based on artisan's category (only show relevant requests)
+    final artisanCategory = authController.user.value?['category'] ?? '';
+    final filteredUrgent = displayUrgentDemands.where((demand) {
+      if (artisanCategory.isEmpty) return true;
+      return demand['category']?.toLowerCase().contains(artisanCategory.toLowerCase()) ?? true;
+    }).toList();
+
+    final filteredNormal = displayNormalDemands.where((demand) {
+      if (artisanCategory.isEmpty) return true;
+      return demand['category']?.toLowerCase().contains(artisanCategory.toLowerCase()) ?? true;
+    }).toList();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -202,7 +220,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 🔴 Urgent Demands Section
-          if (displayUrgentDemands.isNotEmpty) ...[
+          if (filteredUrgent.isNotEmpty) ...[
             Row(
               children: [
                 Container(
@@ -230,7 +248,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${displayUrgentDemands.length} demande',
+                    '${filteredUrgent.length} demande${filteredUrgent.length > 1 ? 's' : ''}',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -241,12 +259,12 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ...displayUrgentDemands.map((demand) => _buildUrgentDemandCard(demand, context)),
+            ...filteredUrgent.map((demand) => _buildUrgentDemandCard(demand, context)),
             const SizedBox(height: 32),
           ],
 
           // 🟢 Normal Demands Section
-          if (displayNormalDemands.isNotEmpty) ...[
+          if (filteredNormal.isNotEmpty) ...[
             Row(
               children: [
                 Container(
@@ -274,7 +292,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${displayNormalDemands.length} demande',
+                    '${filteredNormal.length} demande${filteredNormal.length > 1 ? 's' : ''}',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -285,10 +303,10 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ...displayNormalDemands.map((demand) => _buildNormalDemandCard(demand, context)),
+            ...filteredNormal.map((demand) => _buildNormalDemandCard(demand, context)),
           ],
 
-          if (displayUrgentDemands.isEmpty && displayNormalDemands.isEmpty)
+          if (filteredUrgent.isEmpty && filteredNormal.isEmpty)
             _buildEmptyState(),
         ],
       ),
@@ -297,18 +315,21 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
 
   // Helper: Convert RequestModel to Map<String, dynamic> for card compatibility
   Map<String, dynamic> _requestModelToMap(RequestModel req) {
+    // Get client name - try to fetch from storage or use fallback
+    String clientName = 'Client #${req.clientId}';
+
     return {
       'idRequest': req.idRequest,
       'IDRequest': req.idRequest,
       'clientId': req.clientId,
       'clientID': req.clientId,
       'ClientID': req.clientId,
-      'name': 'Client #${req.clientId}',
-      'clientName': 'Client #${req.clientId}',
+      'name': clientName,
+      'clientName': clientName,
       'time': _formatDate(req.requestDate),
       'createdAt': req.requestDate.toIso8601String(),
       'category': req.category,
-      'location': 'Zone ${req.zoneKm ?? 10} km',
+      'location': req.zoneKm != null && req.zoneKm! > 0 ? 'Zone ${req.zoneKm} km' : 'Non spécifié',
       'zone': req.zoneKm != null ? 'Zone ${req.zoneKm} km' : 'Non spécifié',
       'zoneKm': req.zoneKm,
       'description': req.description,
@@ -317,18 +338,23 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
       'status': req.status,
       'latitude': req.latitude,
       'longitude': req.longitude,
+      'imageUrl': req.imageUrl,
     };
   }
 
   // ============================================================
-  // 🟢 Normal Demand Card - NO DESIGN CHANGE
+  // 🟢 Normal Demand Card - PRESERVED YOUR DESIGN
   // ============================================================
   Widget _buildNormalDemandCard(Map<String, dynamic> demand, BuildContext context) {
-    final clientName = demand['client']?['username'] ?? demand['name'] ?? demand['clientName'] ?? 'Client';
-    final clientId = demand['clientId'] ?? demand['clientID'] ?? demand['ClientID'] ?? demand['client']?['id'] ?? demand['userId'];
+    final clientName = demand['client']?['username'] ??
+        demand['name'] ??
+        demand['clientName'] ??
+        'Client #${demand['clientId'] ?? '?'}';
+    final clientId = demand['clientId'] ?? demand['clientID'] ?? demand['ClientID'];
     final category = demand['category'] ?? 'Général';
     final location = demand['location'] ?? demand['zone'] ?? 'Non spécifié';
     final description = demand['description'] ?? '';
+    final imageUrl = demand['imageUrl'];
 
     String createdAt;
     if (demand['time'] != null) {
@@ -422,6 +448,24 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ],
             ),
           ),
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  imageUrl,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 180,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.broken_image, size: 50),
+                  ),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Container(
@@ -432,7 +476,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ),
               child: Text(
                 description,
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 13,
@@ -467,7 +511,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                       ),
                     ),
                     child: const Text(
-                      'Envoyer',
+                      'Contacter',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -481,14 +525,9 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                         final confirm = await _showIgnoreDialog(context);
                         if (confirm) {
                           await requestController.ignoreRequest(requestId);
-                          await requestController.loadAllRequests();
+                          await _loadRealRequests();
                           setState(() {});
                         }
-                      } else {
-                        setState(() {
-                          mockNormalDemands.removeWhere((d) => d['idRequest'] == requestId);
-                        });
-                        Get.snackbar('Info', 'Demande ignorée');
                       }
                     },
                     style: OutlinedButton.styleFrom(
@@ -515,14 +554,18 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   }
 
   // ============================================================
-  // 🔴 Urgent Demand Card - NO DESIGN CHANGE
+  // 🔴 Urgent Demand Card - PRESERVED YOUR DESIGN
   // ============================================================
   Widget _buildUrgentDemandCard(Map<String, dynamic> demand, BuildContext context) {
-    final clientName = demand['client']?['username'] ?? demand['name'] ?? demand['clientName'] ?? 'Client';
+    final clientName = demand['client']?['username'] ??
+        demand['name'] ??
+        demand['clientName'] ??
+        'Client #${demand['clientId'] ?? '?'}';
     final clientId = demand['clientId'] ?? demand['clientID'] ?? demand['ClientID'];
     final category = demand['category'] ?? 'Général';
     final location = demand['location'] ?? demand['zone'] ?? 'Non spécifié';
     final description = demand['description'] ?? '';
+    final imageUrl = demand['imageUrl'];
 
     String createdAt;
     if (demand['time'] != null) {
@@ -616,6 +659,24 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ],
             ),
           ),
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  imageUrl,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 180,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.broken_image, size: 50),
+                  ),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Container(
@@ -626,7 +687,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
               ),
               child: Text(
                 description,
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 13,
@@ -669,14 +730,9 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                         final confirm = await _showDeclineConfirmationDialog(context);
                         if (confirm) {
                           await requestController.declineRequest(requestId);
-                          await requestController.loadAllRequests();
+                          await _loadRealRequests();
                           setState(() {});
                         }
-                      } else {
-                        setState(() {
-                          mockUrgentDemands.removeWhere((d) => d['idRequest'] == requestId);
-                        });
-                        Get.snackbar('Info', 'Demande refusée');
                       }
                     },
                     style: OutlinedButton.styleFrom(
@@ -703,7 +759,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   }
 
   // ============================================================
-  // Helper Methods (unchanged)
+  // Helper Methods
   // ============================================================
   Future<bool> _showIgnoreDialog(BuildContext context) async {
     return await showDialog(
@@ -781,7 +837,11 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
   }
 
   void _showAcceptDialog(BuildContext context, Map<String, dynamic> demand) {
-    final clientName = demand['client']?['username'] ?? demand['client']?['name'] ?? demand['name'] ?? demand['clientName'] ?? 'ce client';
+    final clientName = demand['client']?['username'] ??
+        demand['client']?['name'] ??
+        demand['name'] ??
+        demand['clientName'] ??
+        'ce client';
     final requestId = demand['idRequest'] ?? demand['IDRequest'] ?? demand['id'];
     final isUrgent = demand['isUrgent'] == true || demand['type'] == 'urgent';
 
@@ -845,7 +905,7 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                 Get.back();
 
                 if (success && mounted) {
-                  await requestController.loadAllRequests();
+                  await _loadRealRequests();
                   setState(() {});
                   Get.snackbar(
                     'Succès',
@@ -860,12 +920,6 @@ class _ArtisanHomeScreenState extends State<ArtisanHomeScreen> {
                     ),
                   );
                 }
-              } else {
-                Get.back();
-                setState(() {
-                  mockUrgentDemands.removeWhere((d) => d['idRequest'] == requestId);
-                });
-                Get.snackbar('Succès', '✅ Demande acceptée!');
               }
             },
             style: ElevatedButton.styleFrom(

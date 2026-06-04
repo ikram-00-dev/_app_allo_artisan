@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../controllers/auth_controller.dart';
-import '../../services/api_service.dart';
 
 enum RegistrationStep { form, waiting }
 
@@ -42,17 +41,17 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
   bool _showConfirmPassword = false;
   bool _isLoading = false;
 
-  // Track if files are "uploaded" (simulated)
+  // Track if files are selected
   bool _hasProfileImage = false;
   bool _hasDiploma = false;
   bool _hasOfficialDoc = false;
 
-  // Simulated upload states
+  // Upload states
   bool _isUploadingProfileImage = false;
   bool _isUploadingDiploma = false;
   bool _isUploadingOfficialDoc = false;
 
-  // Store simulated file paths (just for display)
+  // Store selected file paths
   File? _profileImageFile;
   File? _diplomaFile;
   File? _officialDocFile;
@@ -84,6 +83,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
+  // Simple file picker for profile image
   Future<void> _pickProfileImage() async {
     try {
       final XFile? file = await _picker.pickImage(
@@ -95,15 +95,8 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
 
       setState(() {
         _profileImageFile = File(file.path);
-        _isUploadingProfileImage = true;
-      });
-
-      final uploadedUrl = await ApiService.uploadImage(file.path);
-
-      setState(() {
         _hasProfileImage = true;
         _isUploadingProfileImage = false;
-        _formData['avatarUrl'] = uploadedUrl;
       });
 
       Get.snackbar(
@@ -116,32 +109,27 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
       );
     } catch (e) {
       setState(() => _isUploadingProfileImage = false);
-      debugPrint('Error uploading artisan profile image: $e');
       Get.snackbar(
         'Erreur',
-        'Impossible de télécharger la photo',
+        'Erreur lors de la sélection',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
     }
   }
 
-  // SIMULATED document picker
+  // Simple file picker for diploma
   Future<void> _pickDiploma() async {
     try {
-      final XFile? file = await _picker.pickMedia();
+      final XFile? file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
 
       if (file == null) return;
 
       setState(() {
         _diplomaFile = File(file.path);
-        _isUploadingDiploma = true;
-      });
-
-      // Simulate upload delay
-      await Future.delayed(const Duration(seconds: 1));
-
-      setState(() {
         _hasDiploma = true;
         _isUploadingDiploma = false;
         _formData['diplomaUrl'] = 'simulated_diploma_${DateTime.now().millisecondsSinceEpoch}.pdf';
@@ -166,22 +154,18 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
     }
   }
 
-  // SIMULATED official document picker
+  // Simple file picker for official document
   Future<void> _pickOfficialDoc() async {
     try {
-      final XFile? file = await _picker.pickMedia();
+      final XFile? file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
 
       if (file == null) return;
 
       setState(() {
         _officialDocFile = File(file.path);
-        _isUploadingOfficialDoc = true;
-      });
-
-      // Simulate upload delay
-      await Future.delayed(const Duration(seconds: 1));
-
-      setState(() {
         _hasOfficialDoc = true;
         _isUploadingOfficialDoc = false;
         _formData['officialDocUrl'] = 'simulated_official_${DateTime.now().millisecondsSinceEpoch}.pdf';
@@ -217,14 +201,14 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
         return;
       }
     } else if (_formStep == 2) {
+      // Documents are optional - just show warning but allow proceeding
       if (!_hasDiploma) {
-        _showError('Veuillez télécharger votre diplôme/certification');
-        return;
+        _showWarning('Vous pouvez ajouter un diplôme plus tard');
       }
       if (!_hasOfficialDoc) {
-        _showError('Veuillez télécharger votre document officiel');
-        return;
+        _showWarning('Vous pouvez ajouter un document officiel plus tard');
       }
+      // Always proceed to next step
     } else if (_formStep == 3) {
       if (_formData['email'].isEmpty && _formData['phoneNumber'].isEmpty) {
         _showError('Veuillez fournir au moins un email ou un numéro de téléphone');
@@ -257,6 +241,18 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
       message,
       backgroundColor: Colors.red,
       colorText: Colors.white,
+      snackPosition: SnackPosition.TOP,
+    );
+  }
+
+  void _showWarning(String message) {
+    Get.snackbar(
+      "Information",
+      message,
+      backgroundColor: Colors.orange,
+      colorText: Colors.white,
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 2),
     );
   }
 
@@ -265,13 +261,11 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
 
     final String finalUsername = '${_formData['firstName'].toLowerCase()}_${_formData['lastName'].toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}';
 
-    // Build email from phone if email not provided
     String email = _formData['email'].toString().trim();
     if (email.isEmpty && _formData['phoneNumber'].toString().isNotEmpty) {
       email = "${_formData['phoneNumber']}@temp.com";
     }
 
-    // Simulate API call delay
     await Future.delayed(const Duration(seconds: 1));
 
     final success = await auth.registerArtisan(
@@ -285,15 +279,15 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
       province: _formData['province'],
       city: _formData['city'],
       district: _formData['district'],
-      diplomaUrl: _formData['diplomaUrl'].toString(),
-      officialDocUrl: _formData['officialDocUrl'].toString(),
+      diplomaUrl: _hasDiploma ? _formData['diplomaUrl'].toString() : '',
+      officialDocUrl: _hasOfficialDoc ? _formData['officialDocUrl'].toString() : '',
       avatarUrl: _hasProfileImage ? _formData['avatarUrl'].toString() : null,
       experience: null,
     );
 
     setState(() => _isLoading = false);
 
-    if (success) {
+    if (success && mounted) {
       setState(() => _registrationStep = RegistrationStep.waiting);
     }
   }
@@ -316,7 +310,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
               ),
               const SizedBox(height: 16),
               InkWell(
-                onTap: _isUploadingProfileImage ? null : _pickProfileImage,
+                onTap: _pickProfileImage,
                 child: Container(
                   width: 120,
                   height: 120,
@@ -325,18 +319,13 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                     color: Colors.grey.shade200,
                     border: Border.all(color: const Color(0xFF2563EB), width: 2),
                   ),
-                  child: _isUploadingProfileImage
-                      ? const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
-                    ),
-                  )
-                      : _hasProfileImage
+                  child: _hasProfileImage && _profileImageFile != null
                       ? ClipOval(
-                    child: Container(
-                      color: Colors.green.shade100,
-                      child: const Icon(Icons.check_circle, size: 48, color: Colors.green),
+                    child: Image.file(
+                      _profileImageFile!,
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.cover,
                     ),
                   )
                       : const Column(
@@ -507,7 +496,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                     ),
                     const SizedBox(height: 12),
                     InkWell(
-                      onTap: _isUploadingOfficialDoc ? null : _pickOfficialDoc,
+                      onTap: _pickOfficialDoc,
                       child: Container(
                         height: 120,
                         decoration: BoxDecoration(
@@ -515,24 +504,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                           borderRadius: BorderRadius.circular(12),
                           color: Colors.white,
                         ),
-                        child: _isUploadingOfficialDoc
-                            ? const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Téléchargement...',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF2563EB)),
-                              ),
-                            ],
-                          ),
-                        )
-                            : _hasOfficialDoc
+                        child: _hasOfficialDoc
                             ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -612,7 +584,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                     ),
                     const SizedBox(height: 12),
                     InkWell(
-                      onTap: _isUploadingDiploma ? null : _pickDiploma,
+                      onTap: _pickDiploma,
                       child: Container(
                         height: 120,
                         decoration: BoxDecoration(
@@ -620,24 +592,7 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
                           borderRadius: BorderRadius.circular(12),
                           color: Colors.white,
                         ),
-                        child: _isUploadingDiploma
-                            ? const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Téléchargement...',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF2563EB)),
-                              ),
-                            ],
-                          ),
-                        )
-                            : _hasDiploma
+                        child: _hasDiploma
                             ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -850,7 +805,6 @@ class _RegisterArtisanScreenState extends State<RegisterArtisanScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Progress indicator
                   Row(
                     children: [
                       Expanded(child: Column(children: [

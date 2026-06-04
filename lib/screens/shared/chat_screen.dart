@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
 import '../../controllers/message_controller.dart';
 import '../../models/message.dart';
 import '../../services/storage_service.dart';
@@ -20,8 +19,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final MessageController controller = Get.find();
-
+  final MessageController controller = Get.find<MessageController>();
   final TextEditingController textController = TextEditingController();
   final ScrollController scrollController = ScrollController();
 
@@ -31,23 +29,21 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserRole();
+    _loadUserInfo();
     controller.fetchMessages(widget.contactId);
   }
 
-  Future<void> _loadUserRole() async {
+  Future<void> _loadUserInfo() async {
     final role = await StorageService.getRole();
+    final user = await StorageService.getUser();
+
     setState(() {
       isArtisan = role == 'artisan';
+      currentUserId = user?['ID'] ?? user?['id'] ?? 0;
     });
-
-    final user = await StorageService.getUser();
-    if (user != null) {
-      currentUserId = user['ID'] ?? user['id'] ?? 0;
-    }
   }
 
-  void scrollToBottom() {
+  void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 300), () {
       if (scrollController.hasClients) {
         scrollController.animateTo(
@@ -59,136 +55,99 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void sendMessage() async {
-    if (textController.text.trim().isEmpty) return;
+  Future<void> _sendMessage() async {
+    final text = textController.text.trim();
+    if (text.isEmpty) return;
 
     await controller.sendMessage(
-      text: textController.text.trim(),
+      text: text,
       contactId: widget.contactId,
       isSentByArtisan: isArtisan,
     );
 
     textController.clear();
-    scrollToBottom();
+    _scrollToBottom();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xffECE5DD),
-
-      /// ================= APP BAR =================
       appBar: AppBar(
         backgroundColor: const Color(0xff075E54),
         foregroundColor: Colors.white,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.contactName,
-                style: const TextStyle(fontSize: 16)),
-            const Text(
-              "en ligne",
-              style: TextStyle(fontSize: 12),
-            ),
+            Text(widget.contactName, style: const TextStyle(fontSize: 16)),
+            const Text("en ligne", style: TextStyle(fontSize: 12)),
           ],
         ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Get.back(),
+        ),
       ),
-
-      /// ================= BODY =================
       body: Column(
         children: [
-
-          /// ================= MESSAGES =================
+          // Messages List
           Expanded(
             child: Obx(() {
-              // Filter messages for this contact
               final messages = controller.messages
                   .where((m) => m.contactId == widget.contactId)
                   .toList();
 
               if (controller.isLoading.value && messages.isEmpty) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
+                return const Center(child: CircularProgressIndicator());
               }
 
               return ListView.builder(
                 controller: scrollController,
                 padding: const EdgeInsets.all(12),
+                reverse: false,
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final msg = messages[index];
-
-                  final isMe = msg.isSentByCurrentUser(
-                    isArtisan,
-                    currentUserId,
-                  );
+                  final isMe = msg.isSentByCurrentUser(isArtisan, currentUserId);
 
                   return Align(
-                    alignment: isMe
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
+                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                     child: Container(
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 4,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      constraints: const BoxConstraints(
-                        maxWidth: 280,
-                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      constraints: const BoxConstraints(maxWidth: 280),
                       decoration: BoxDecoration(
-                        color: isMe
-                            ? const Color(0xffDCF8C6)
-                            : Colors.white,
+                        color: isMe ? const Color(0xffDCF8C6) : Colors.white,
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(12),
                           topRight: const Radius.circular(12),
-                          bottomLeft: Radius.circular(
-                            isMe ? 12 : 0,
-                          ),
-                          bottomRight: Radius.circular(
-                            isMe ? 0 : 12,
-                          ),
+                          bottomLeft: Radius.circular(isMe ? 12 : 0),
+                          bottomRight: Radius.circular(isMe ? 0 : 12),
                         ),
                       ),
                       child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          /// TEXT
                           Text(
                             msg.text,
-                            style: const TextStyle(
-                              fontSize: 14,
-                            ),
+                            style: const TextStyle(fontSize: 15),
                           ),
                           const SizedBox(height: 4),
-
-                          /// TIME + SEEN
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 msg.formattedTime,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey[600],
-                                ),
+                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                               ),
-                              const SizedBox(width: 5),
-                              if (isMe)
+                              if (isMe) ...[
+                                const SizedBox(width: 5),
                                 Icon(
-                                  msg.seen
-                                      ? Icons.done_all
-                                      : Icons.done,
+                                  msg.seen ? Icons.done_all : Icons.done,
                                   size: 14,
-                                  color: msg.seen
-                                      ? Colors.blue
-                                      : Colors.grey,
+                                  color: msg.seen ? Colors.blue : Colors.grey,
                                 ),
+                              ],
                             ],
                           ),
                         ],
@@ -200,53 +159,38 @@ class _ChatScreenState extends State<ChatScreen> {
             }),
           ),
 
-          /// ================= INPUT =================
+          // Message Input
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 6,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             color: Colors.white,
             child: Row(
               children: [
-
-                /// TEXT FIELD
                 Expanded(
                   child: TextField(
                     controller: textController,
                     decoration: InputDecoration(
-                      hintText: "Message...",
-                      contentPadding:
-                      const EdgeInsets.symmetric(
-                        horizontal: 12,
-                      ),
+                      hintText: "Écrire un message...",
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       filled: true,
-                      fillColor:
-                      const Color(0xffF0F0F0),
+                      fillColor: const Color(0xffF0F0F0),
                       border: OutlineInputBorder(
-                        borderRadius:
-                        BorderRadius.circular(25),
+                        borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
                       ),
                     ),
+                    onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
-                const SizedBox(width: 6),
-
-                /// SEND BUTTON
+                const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: sendMessage,
+                  onTap: _sendMessage,
                   child: Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: const BoxDecoration(
                       color: Color(0xff075E54),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.send,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.send, color: Colors.white, size: 24),
                   ),
                 ),
               ],
@@ -255,5 +199,12 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    textController.dispose();
+    scrollController.dispose();
+    super.dispose();
   }
 }

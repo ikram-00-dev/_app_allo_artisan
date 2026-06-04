@@ -96,6 +96,7 @@ class ArtisanController extends GetxController {
     }
   }
 
+
   // ============================================================
   // LOAD CLIENT PROFILE (For client viewing their own profile)
   // ============================================================

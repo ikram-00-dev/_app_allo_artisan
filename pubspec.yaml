@@ -48,6 +48,8 @@ dependencies:
   # IMAGE HANDLING
   # ========================
   image_picker: ^1.0.7
+    # Add this for temporary directory access
+  path_provider: ^2.1.1
 
   # ========================
   # PERMISSIONS

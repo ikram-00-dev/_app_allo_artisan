@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
+import'package:allo_artisan_gpt/screens/auth/waiting_screen.dart';
 
 class AuthController extends GetxController {
   // ============================================================
@@ -338,6 +339,9 @@ class AuthController extends GetxController {
   // ============================================================
   // REGISTER ARTISAN
   // ============================================================
+  // ============================================================
+// REGISTER ARTISAN - FIXED VERSION
+// ============================================================
   Future<bool> registerArtisan({
     required String firstName,
     String? middleName,
@@ -358,6 +362,13 @@ class AuthController extends GetxController {
     try {
       isLoading.value = true;
 
+      debugPrint('📝 Registering artisan with:');
+      debugPrint('   firstName: $firstName');
+      debugPrint('   lastName: $lastName');
+      debugPrint('   email: $email');
+      debugPrint('   phoneNumber: $phoneNumber');
+      debugPrint('   category: $category');
+
       final response = await ApiService.registerArtisan(
         firstName: firstName,
         middleName: middleName,
@@ -376,21 +387,31 @@ class AuthController extends GetxController {
         experience: experience,
       );
 
+      debugPrint('✅ Registration response: $response');
+
+      // Show success message
       Get.snackbar(
         "Succès",
-        "Compte artisan créé avec succès! En attente d'approbation.",
+        "Votre demande d'inscription a été envoyée! En attente d'approbation.",
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+        snackPosition: SnackPosition.TOP,
       );
 
-      Get.offAllNamed("/login");
+      // Navigate to waiting screen
+      Get.offAll(() => const WaitingScreen(isArtisan: true));
+
       return true;
     } catch (e) {
+      debugPrint('❌ Registration error: $e');
       Get.snackbar(
         "Erreur",
         "Impossible de créer le compte: ${e.toString().replaceFirst('Exception: ', '')}",
         backgroundColor: Colors.red,
         colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+        snackPosition: SnackPosition.TOP,
       );
       return false;
     } finally {

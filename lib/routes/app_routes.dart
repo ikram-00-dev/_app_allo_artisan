@@ -20,6 +20,7 @@ class AppRoutes {
   static const adminPanel = "/admin-panel";           // ← NEW
   static const pendingArtisans = "/pending-artisans"; // ← NEW
   static const addModerator = "/add-moderator";       // ← NEW
+  static const chat = "/chat";                    // ← ADD THIS
   // Helper method to get login route with redirect
   static String getLoginWithRedirect(String redirectRoute) {
     return '$login?redirect=$redirectRoute';

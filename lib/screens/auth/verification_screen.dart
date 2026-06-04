@@ -35,13 +35,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
     debugPrint('formData keys: ${widget.formData.keys}');
     debugPrint('formData: ${widget.formData}');
 
-    // Check critical fields
     debugPrint('firstName: ${widget.formData['firstName']}');
     debugPrint('lastName: ${widget.formData['lastName']}');
-    debugPrint('username: ${widget.formData['username']}');
     debugPrint('email: ${widget.formData['email']}');
     debugPrint('phoneNumber: ${widget.formData['phoneNumber']}');
-    debugPrint('password: ${widget.formData['password'] != null ? "***" : "MISSING"}');
   }
 
   Future<void> _verifyAndRegister() async {
@@ -49,7 +46,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
     try {
       if (widget.isArtisan) {
-        // For artisan registration
         debugPrint('📝 Registering artisan...');
 
         final success = await authController.registerArtisan(
@@ -73,15 +69,15 @@ class _VerificationScreenState extends State<VerificationScreen> {
         );
 
         if (success) {
-          debugPrint('✅ Artisan registration successful');
-          // Navigate to waiting screen for artisan
-          Get.off(() => const WaitingScreen(isArtisan: true));
+          debugPrint('✅ Artisan registration successful, navigating to waiting screen');
+          // The AuthController already navigates to waiting screen
+          // So we don't need to do anything here
+        } else {
+          _showError('Échec de l\'inscription. Veuillez réessayer.');
         }
       } else {
-        // For client registration
         debugPrint('📝 Registering client...');
 
-        // Ensure we have email or phone number
         final email = widget.formData['email']?.toString() ?? '';
         final phoneNumber = widget.formData['phoneNumber']?.toString() ?? '';
 
@@ -130,16 +126,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
     );
   }
 
-  void _showSuccess(String message) {
-    Get.snackbar(
-      "Succès",
-      message,
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-      snackPosition: SnackPosition.TOP,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,7 +164,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    widget.isArtisan ? 'Demande envoyée' : 'Confirmation',
+                    widget.isArtisan ? 'Vérification des informations' : 'Confirmation',
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -188,7 +174,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   const SizedBox(height: 16),
                   Text(
                     widget.isArtisan
-                        ? 'Votre demande d\'inscription a été enregistrée.'
+                        ? 'Vérifiez vos informations avant de soumettre votre demande:'
                         : 'Vérifiez vos informations avant validation:',
                     style: TextStyle(
                       fontSize: 16,
@@ -239,6 +225,31 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Info message for artisans
+                  if (widget.isArtisan)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Votre demande sera examinée par un administrateur. Vous recevrez une notification par email une fois votre compte approuvé.',
+                              style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   const SizedBox(height: 24),
 
