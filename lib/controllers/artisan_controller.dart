@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import '../models/artisan.dart';
 import '../models/post.dart';
 import '../services/storage_service.dart';
+import '../models/user.dart';
 
 class ArtisanController extends GetxController {
   // ============================================================
@@ -112,12 +113,91 @@ class ArtisanController extends GetxController {
   // ============================================================
   // LOAD ARTISAN BY ID (Public profile view)
   // ============================================================
+  // In artisan_controller.dart, add this method to handle fake artisans
+
+  // In artisan_controller.dart - Fix the loadArtisanById method
+
+  // In artisan_controller.dart - Fix the loadArtisanById method
+
   Future<void> loadArtisanById(int id) async {
     try {
       isLoading.value = true;
+
+      // Create a default User for fake artisans
+      User createUser(String firstName, String lastName, String email, String phone, String avatarUrl) {
+        return User(
+          idUser: id,
+          firstName: firstName,
+          middleName: '',
+          lastName: lastName,
+          username: '$firstName $lastName',
+          email: email,
+          phoneNumber: phone,
+          password: '',
+          creationDate: DateTime.now(),
+          avatarUrl: avatarUrl,
+          role: 'artisan',
+        );
+      }
+
+      // Check if it's a fake artisan (IDs 9991, 9992)
+      if (id == 9991) {
+        // Aymen Aymen - fake data
+        artisan.value = Artisan(
+          user: createUser('Aymen', 'Aymen', 'aymen.aymen@example.com', '+213 551 23 45 67', ''),
+          status: 'active',
+          isAvailable: true,
+          category: 'Plomberie',
+          activesStatus: 'active',
+          diploma: 'Certification professionnelle Plomberie',
+          bio: 'Plombier professionnel avec 12 ans d\'expérience. Intervention rapide et travail soigné. Disponible 7j/7.',
+          officialDoc: '',
+          province: 'Alger',
+          city: 'Alger Centre',
+          district: '10km',
+          latitude: null,
+          longitude: null,
+          experience: 12,
+          rating: 4.9,
+          reviewCount: 128,
+          followers: null,
+          availability: null,
+        );
+        await loadArtisanPosts(9991);
+        isLoading.value = false;
+        return;
+      }
+
+      if (id == 9992) {
+        // Yasser Yasser - fake data
+        artisan.value = Artisan(
+          user: createUser('Yasser', 'Yasser', 'yasser.yasser@example.com', '+213 552 34 56 78', ''),
+          status: 'active',
+          isAvailable: true,
+          category: 'Électricité',
+          activesStatus: 'active',
+          diploma: 'Bac Technicien Électrique',
+          bio: 'Électricien certifié, spécialiste en installation et dépannage électrique. Travail de qualité garanti.',
+          officialDoc: '',
+          province: 'Alger',
+          city: 'Alger Centre',
+          district: '15km',
+          latitude: null,
+          longitude: null,
+          experience: 10,
+          rating: 4.8,
+          reviewCount: 95,
+          followers: null,
+          availability: null,
+        );
+        await loadArtisanPosts(9992);
+        isLoading.value = false;
+        return;
+      }
+
+      // For real artisans, call API
       final response = await ApiService.getArtisanById(id);
       artisan.value = Artisan.fromJson(response);
-
       await checkFollowingStatus(id);
       await loadArtisanPosts(id);
 
@@ -160,6 +240,10 @@ class ArtisanController extends GetxController {
   // ============================================================
 // LOAD ALL ARTISANS (For search screen)
 // ============================================================
+  // In artisan_controller.dart - Fix loadAllArtisans
+
+  // In artisan_controller.dart - Fix loadAllArtisans
+
   Future<void> loadAllArtisans() async {
     try {
       isLoading.value = true;
@@ -167,7 +251,6 @@ class ArtisanController extends GetxController {
 
       print('Loaded ${response.length} artisans from API');
 
-      // response is already a List from ApiService
       allArtisans.value = response.map((json) => Artisan.fromJson(json)).toList();
 
       print('Parsed ${allArtisans.length} artisans');
@@ -178,7 +261,6 @@ class ArtisanController extends GetxController {
       isLoading.value = false;
     }
   }
-
   // ============================================================
   // LOAD AVAILABILITY FROM BACKEND
   // ============================================================

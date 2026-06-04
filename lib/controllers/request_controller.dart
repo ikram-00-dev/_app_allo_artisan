@@ -1,11 +1,11 @@
-// lib/controllers/request_controller.dart - COMPLETELY FIXED
+// lib/controllers/request_controller.dart - UPDATED to fetch client names
 
-import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../controllers/auth_controller.dart';
 import '../models/request_model.dart';
-import '../services/storage_service.dart';
 
 class RequestController extends GetxController {
   var isLoading = false.obs;
@@ -18,19 +18,23 @@ class RequestController extends GetxController {
   var urgentRequests = <RequestModel>[].obs;
   var normalRequests = <RequestModel>[].obs;
 
+  // Store client details
+  var clientNames = <int, String>{}.obs;
+
   final List<String> categories = [
-    'Plombier',
-    'Électricien',
-    'Menuisier',
-    'Maçon',
-    'Peintre en bâtiment',
-    'Carreleur',
-    'Couvreur',
-    'Soudeur',
-    'Forgeron',
-    'Plaquiste',
-    'Coffreur',
-    'Technicien CVC',
+    'Plomberie',
+    'Électricité',
+    'Menuiserie',
+    'Maçonnerie',
+    'Peinture',
+    'Carrelage',
+    'Jardinage',
+    'Climatisation',
+    'Soudure',
+    'Plâtrerie',
+    'Électronique',
+    'Informatique',
+    'Cuisine',
   ];
 
   @override
@@ -43,7 +47,48 @@ class RequestController extends GetxController {
     await loadAllRequests();
   }
 
-  // Load all requests (for explore feed)
+  // Fetch client name by ID
+  Future<String> getClientName(int clientId) async {
+    // Check if we already have it cached
+    if (clientNames.containsKey(clientId)) {
+      return clientNames[clientId]!;
+    }
+
+    try {
+      final response = await ApiService.get('/clients/$clientId');
+      String name = '';
+
+      if (response is Map) {
+        // Try different field names
+        name = response['fullName'] ??
+            response['name'] ??
+            response['username'] ??
+            '${response['firstName'] ?? ''} ${response['lastName'] ?? ''}'.trim();
+
+        if (name.isEmpty) {
+          name = 'Client #$clientId';
+        }
+      } else {
+        name = 'Client #$clientId';
+      }
+
+      clientNames[clientId] = name;
+      return name;
+    } catch (e) {
+      debugPrint('Error fetching client name for $clientId: $e');
+      return 'Client #$clientId';
+    }
+  }
+
+  // Fetch multiple client names at once
+  Future<void> loadClientNames(List<int> clientIds) async {
+    final uniqueIds = clientIds.toSet().where((id) => !clientNames.containsKey(id)).toList();
+
+    for (var id in uniqueIds) {
+      await getClientName(id);
+    }
+  }
+
   // Load all requests (for explore feed)
   Future<void> loadAllRequests() async {
     try {
@@ -51,21 +96,41 @@ class RequestController extends GetxController {
       debugPrint('🔄 Loading all requests...');
 
       final response = await ApiService.getRequests();
-      debugPrint('📦 Raw response from API: $response');
 
       final List<dynamic> responseData = response is List ? response : [];
       debugPrint('📊 Response data length: ${responseData.length}');
 
       final allRequests = responseData.map((json) {
-        debugPrint('📝 Converting JSON to RequestModel: $json');
         return RequestModel.fromJson(json);
       }).toList();
 
       debugPrint('✅ Converted ${allRequests.length} requests');
 
+      // Load client names for all unique client IDs
+      final clientIds = allRequests.map((r) => r.clientId).toSet().toList();
+      await loadClientNames(clientIds);
+
       requests.value = allRequests;
-      urgentRequests.value = allRequests.where((r) => r.type == 'urgent').toList();
-      normalRequests.value = allRequests.where((r) => r.type == 'simple').toList();
+
+      // Filter by artisan's category if artisan is logged in
+      final authController = Get.find<AuthController>();
+      final artisanCategory = authController.user.value?['category']?.toString().toLowerCase() ?? '';
+
+      if (authController.isArtisan && artisanCategory.isNotEmpty) {
+        // Only show requests matching artisan's category
+        urgentRequests.value = allRequests.where((r) =>
+        r.type == 'urgent' &&
+            r.category.toLowerCase().contains(artisanCategory)
+        ).toList();
+
+        normalRequests.value = allRequests.where((r) =>
+        r.type == 'simple' &&
+            r.category.toLowerCase().contains(artisanCategory)
+        ).toList();
+      } else {
+        urgentRequests.value = allRequests.where((r) => r.type == 'urgent').toList();
+        normalRequests.value = allRequests.where((r) => r.type == 'simple').toList();
+      }
 
       debugPrint('📊 Urgent: ${urgentRequests.length}, Normal: ${normalRequests.length}');
     } catch (e) {
@@ -75,8 +140,7 @@ class RequestController extends GetxController {
     }
   }
 
-// Load client's own requests - FIXED
-  // Load client's own requests - FIXED with filter for valid data
+  // Load client's own requests
   Future<void> loadMyRequests(int clientId) async {
     try {
       isLoading.value = true;
@@ -89,10 +153,7 @@ class RequestController extends GetxController {
 
       final allRequests = responseData
           .map((json) => RequestModel.fromJson(json))
-          .where((req) =>
-      req.clientId == clientId &&
-          req.idRequest != null &&
-          req.description.isNotEmpty) // Filter out empty demands
+          .where((req) => req.clientId == clientId && req.idRequest != null)
           .toList();
 
       myRequests.value = allRequests;
@@ -105,11 +166,7 @@ class RequestController extends GetxController {
     }
   }
 
-  // In request_controller.dart - Update the createRequest method:
-
-// CREATE REQUEST
-  // CREATE REQUEST - FIXED VERSION
-  // CREATE REQUEST - SIMPLIFIED FIXED VERSION
+  // CREATE REQUEST
   Future<bool> createRequest({
     required String description,
     required String category,
@@ -127,7 +184,6 @@ class RequestController extends GetxController {
       final user = authController.user.value;
 
       debugPrint('========== REQUEST CONTROLLER ==========');
-      debugPrint('User object: $user');
 
       // Try multiple possible field names for client ID
       int? clientId = user?['id'] ??
@@ -157,18 +213,17 @@ class RequestController extends GetxController {
         }
       }
 
-      // Prepare data with correct field names (lowercase as backend expects)
       final Map<String, dynamic> data = {
         'description': description.trim(),
         'type': isUrgent ? 'urgent' : 'simple',
         'category': category,
         'latitude': latitude,
         'longitude': longitude,
-        'clientId': clientId,  // This matches backend's json:"clientId"
+        'clientId': clientId,
       };
 
       if (isUrgent && zoneKm != null && zoneKm > 0) {
-        data['zoneKm'] = zoneKm;  // Matches backend's json:"zoneKm"
+        data['zoneKm'] = zoneKm;
       }
 
       if (priorityLevel != null && priorityLevel.isNotEmpty) {
@@ -241,7 +296,7 @@ class RequestController extends GetxController {
       if (isUrgent && zoneKm != null && zoneKm > 0) {
         updateData['zoneKm'] = zoneKm;
       } else if (!isUrgent) {
-        updateData['zoneKm'] = 0; // optional
+        updateData['zoneKm'] = 0;
       }
 
       if (priorityLevel != null) {
@@ -270,7 +325,8 @@ class RequestController extends GetxController {
       isUpdating.value = false;
     }
   }
-  // DELETE REQUEST - FIXED VERSION
+
+  // DELETE REQUEST
   Future<bool> deleteRequest(int requestId) async {
     try {
       isDeleting.value = true;
@@ -278,36 +334,26 @@ class RequestController extends GetxController {
 
       await ApiService.deleteRequest(requestId);
 
-      // Remove from all lists
       myRequests.removeWhere((req) => req.idRequest == requestId);
       requests.removeWhere((req) => req.idRequest == requestId);
       urgentRequests.removeWhere((req) => req.idRequest == requestId);
       normalRequests.removeWhere((req) => req.idRequest == requestId);
 
-      Get.snackbar(
-          "Succès",
-          "Demande supprimée",
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 2)
-      );
+      Get.snackbar("Succès", "Demande supprimée",
+          backgroundColor: Colors.green, colorText: Colors.white,
+          duration: const Duration(seconds: 2));
       return true;
     } catch (e) {
       debugPrint('Error deleting request: $e');
-      Get.snackbar(
-          "Erreur",
-          "Impossible de supprimer la demande: ${e.toString()}",
-          backgroundColor: Colors.red,
-          colorText: Colors.white
-      );
+      Get.snackbar("Erreur", "Impossible de supprimer la demande: ${e.toString()}",
+          backgroundColor: Colors.red, colorText: Colors.white);
       return false;
     } finally {
       isDeleting.value = false;
     }
   }
-  // REACTIVATE REQUEST (make it active again)
+
   // REACTIVATE REQUEST
-  // In request_controller.dart
   Future<bool> reactivateRequest(int requestId) async {
     try {
       isLoading.value = true;
@@ -316,13 +362,12 @@ class RequestController extends GetxController {
 
       final updateData = {
         'status': 'active',
-        'requestDate': now,      // ← Reset date
-        'createdAt': now,        // ← Reset createdAt so it appears first
+        'requestDate': now,
+        'createdAt': now,
       };
 
       await ApiService.updateRequest(requestId, updateData);
 
-      // Refresh lists
       final authController = Get.find<AuthController>();
       final int? clientId = authController.user.value?['id'] ?? authController.user.value?['clientId'];
 
@@ -331,21 +376,19 @@ class RequestController extends GetxController {
       }
       await loadAllRequests();
 
-      Get.snackbar(
-        "Succès",
-        "Demande réactivée avec succès! Elle apparaît maintenant en premier.",
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      Get.snackbar("Succès", "Demande réactivée avec succès!",
+          backgroundColor: Colors.green , colorText: Colors.white);
       return true;
     } catch (e) {
       print('Error reactivating request: $e');
-      Get.snackbar("Erreur", "Impossible de réactiver la demande", backgroundColor: Colors.red, colorText: Colors.white);
+      Get.snackbar("Erreur", "Impossible de réactiver la demande",
+          backgroundColor: Colors.red, colorText: Colors.white);
       return false;
     } finally {
       isLoading.value = false;
     }
   }
+
   // ACCEPT REQUEST
   Future<bool> acceptRequest(int requestId) async {
     try {

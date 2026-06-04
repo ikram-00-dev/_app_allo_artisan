@@ -1,17 +1,20 @@
 // lib/controllers/post_controller.dart
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:allo_artisan_gpt/services/api_service.dart';
 import '../models/post.dart';
+import '../services/api_service.dart';
+import 'package:flutter/foundation.dart';
 
 class PostController extends GetxController {
+  var posts = <PostModel>[].obs;
   var isLoading = false.obs;
   var isCreating = false.obs;
-  var posts = <PostModel>[].obs;
-
-  // For new post
-  var postContent = ''.obs;
   var postImage = Rxn<String>();
+
+  // Track liked posts locally
+  final Set<int> _likedPosts = {};
+
+  // Use a simple map for like counts
+  final Map<int, int> _localLikeCounts = {};
 
   @override
   void onInit() {
@@ -19,136 +22,155 @@ class PostController extends GetxController {
     fetchAllPosts();
   }
 
-  // Fetch all posts for client home screen
   Future<void> fetchAllPosts() async {
-    isLoading.value = true;
     try {
-      final response = await ApiService.get('/posts');
-      if (response.statusCode == 200) {
-        List<dynamic> data = response.data;
-        posts.value = data.map((json) => PostModel.fromJson(json)).toList();
+      isLoading.value = true;
+      final response = await ApiService.getPosts();
+
+      if (response is List) {
+        posts.value = response.map((json) => PostModel.fromJson(json)).toList();
+        debugPrint('✅ Loaded ${posts.length} posts');
+      } else {
+        posts.value = [];
       }
     } catch (e) {
-      print('Error fetching posts: $e');
+      debugPrint('❌ Error fetching posts: $e');
+      posts.value = [];
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Fetch posts by artisan (for private profile)
-  Future<List<PostModel>> fetchArtisanPosts(int artisanId) async {
-    try {
-      final response = await ApiService.get('/artisans/$artisanId/posts');
-      if (response.statusCode == 200) {
-        List<dynamic> data = response.data;
-        return data.map((json) => PostModel.fromJson(json)).toList();
-      }
-    } catch (e) {
-      print('Error fetching artisan posts: $e');
-    }
-    return [];
-  }
-
-  // Create a new post
   Future<bool> createPost(String content, String? imageUrl) async {
-    isCreating.value = true;
     try {
-      final response = await ApiService.post('/posts', {
-        'content': content,
-        'image': imageUrl,
-      });
+      isCreating.value = true;
+      isLoading.value = true;
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        // Refresh posts list
-        await fetchAllPosts();
-        return true;
-      }
+      final data = {
+        'content': content,
+        'image': imageUrl ?? '',
+      };
+
+      final response = await ApiService.createPost(data);
+      debugPrint('✅ Post created: $response');
+
+      // Clear the post image after successful creation
+      postImage.value = null;
+
+      // Refresh posts list immediately
+      await fetchAllPosts();
+
+      return true;
     } catch (e) {
-      print('Error creating post: $e');
-      Get.snackbar(
-        'Erreur',
-        'Impossible de créer la publication',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      debugPrint('❌ Error creating post: $e');
+      return false;
     } finally {
       isCreating.value = false;
+      isLoading.value = false;
     }
-    return false;
   }
 
-  // Update post
   Future<bool> updatePost(int postId, String content, String? imageUrl) async {
     try {
-      final response = await ApiService.put('/posts/$postId', {
-        'content': content,
-        'image': imageUrl,
-      });
+      isLoading.value = true;
 
-      if (response.statusCode == 200) {
-        await fetchAllPosts();
-        return true;
-      }
+      final data = {
+        'content': content,
+        'image': imageUrl ?? '',
+      };
+
+      await ApiService.put('/posts/$postId', data);
+      debugPrint('✅ Post updated');
+
+      // Refresh posts list immediately
+      await fetchAllPosts();
+
+      return true;
     } catch (e) {
-      print('Error updating post: $e');
-      Get.snackbar(
-        'Erreur',
-        'Impossible de modifier la publication',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      debugPrint('❌ Error updating post: $e');
+      return false;
+    } finally {
+      isLoading.value = false;
     }
-    return false;
   }
 
-  // Delete post
   Future<bool> deletePost(int postId) async {
     try {
-      final response = await ApiService.delete('/posts/$postId');
-      if (response.statusCode == 200) {
-        posts.removeWhere((post) => post.idPost == postId);
-        return true;
-      }
+      isLoading.value = true;
+
+      await ApiService.delete('/posts/$postId');
+      debugPrint('✅ Post deleted');
+
+      // Remove from local list immediately
+      posts.removeWhere((post) => post.idPost == postId);
+
+      // Also remove from local tracking
+      _likedPosts.remove(postId);
+      _localLikeCounts.remove(postId);
+
+      return true;
     } catch (e) {
-      print('Error deleting post: $e');
-      Get.snackbar(
-        'Erreur',
-        'Impossible de supprimer la publication',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      debugPrint('❌ Error deleting post: $e');
+      return false;
+    } finally {
+      isLoading.value = false;
     }
-    return false;
   }
 
-  // Like/unlike post
-  Future<void> toggleLike(int postId) async {
-    try {
-      final response = await ApiService.post('/posts/$postId/like', {});
-      if (response.statusCode == 200) {
-        final index = posts.indexWhere((p) => p.idPost == postId);
-        if (index != -1) {
-          final currentLikes = posts[index].likesCount ?? 0;
-          final isLiked = response.data['liked'] ?? false;
-          posts[index] = PostModel(
-            idPost: posts[index].idPost,
-            content: posts[index].content,
-            image: posts[index].image,
-            artisanId: posts[index].artisanId,
-            createdAt: posts[index].createdAt,
-            updatedAt: posts[index].updatedAt,
-            likesCount: isLiked ? currentLikes + 1 : currentLikes - 1,
-            commentsCount: posts[index].commentsCount,
-          );
-        }
+  void toggleLike(int postId) {
+    final index = posts.indexWhere((post) => post.idPost == postId);
+    if (index != -1) {
+      final post = posts[index];
+      final currentLikes = post.likesCount ?? 0;
+
+      final isLiked = _likedPosts.contains(postId);
+
+      if (isLiked) {
+        // Unlike
+        _likedPosts.remove(postId);
+        _localLikeCounts[postId] = currentLikes - 1;
+      } else {
+        // Like
+        _likedPosts.add(postId);
+        _localLikeCounts[postId] = currentLikes + 1;
       }
-    } catch (e) {
-      print('Error toggling like: $e');
+
+      // Update the post in the list
+      final updatedPost = PostModel(
+        idPost: post.idPost,
+        artisanId: post.artisanId,
+        content: post.content,
+        image: post.image,
+        likesCount: _localLikeCounts[postId] ?? currentLikes,
+        commentsCount: post.commentsCount,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+      );
+
+      posts[index] = updatedPost;
+
+      // TODO: Send API request to like/unlike
+      // await ApiService.likePost(postId);
     }
+  }
+
+  bool isPostLiked(int postId) {
+    return _likedPosts.contains(postId);
+  }
+
+  int getLikesCount(int postId) {
+    final index = posts.indexWhere((post) => post.idPost == postId);
+    if (index != -1) {
+      return posts[index].likesCount ?? 0;
+    }
+    return 0;
+  }
+
+  void setPostImage(String? imageUrl) {
+    postImage.value = imageUrl;
   }
 
   void clearNewPost() {
-    postContent.value = '';
     postImage.value = null;
   }
 }

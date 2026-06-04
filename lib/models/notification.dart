@@ -1,51 +1,53 @@
+// models/notification_model.dart
 import 'package:intl/intl.dart';
 
 class NotificationModel {
-  final int idNotif;
+  final String id;
   final String content;
-  final bool isRead;
-  final DateTime? createdAt;
-  final String? targetRole;
-  final int? clientId;
-  final int? artisanId;
-  final int? adminId;
-  final int? moderatorId;
+  bool isRead;
+  final DateTime timestamp;
+  final String type;
+  final int relatedId;
 
   NotificationModel({
-    required this.idNotif,
+    required this.id,
     required this.content,
     required this.isRead,
-    this.createdAt,
-    this.targetRole,
-    this.clientId,
-    this.artisanId,
-    this.adminId,
-    this.moderatorId,
+    required this.timestamp,
+    required this.type,
+    required this.relatedId,
   });
+
+  String get formattedTime {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) return 'À l\'instant';
+    if (difference.inMinutes < 60) return 'Il y a ${difference.inMinutes} min';
+    if (difference.inHours < 24) return 'Il y a ${difference.inHours} h';
+    if (difference.inDays < 7) return 'Il y a ${difference.inDays} j';
+    return DateFormat('dd/MM/yyyy').format(timestamp);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'content': content,
+      'isRead': isRead,
+      'timestamp': timestamp.toIso8601String(),
+      'type': type,
+      'relatedId': relatedId,
+    };
+  }
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
     return NotificationModel(
-      idNotif: json['IDNotif'] ?? json['idNotif'] ?? 0,
-      content: json['Content'] ?? json['content'] ?? '',
-      isRead: json['IsRead'] ?? json['isRead'] ?? false,
-      createdAt: DateTime.tryParse(json['CreatedAt'] ?? json['createdAt'] ?? ''),
-      targetRole: json['TargetRole'] ?? json['targetRole'],
-      clientId: json['ClientID'] ?? json['clientId'],
-      artisanId: json['ArtisanID'] ?? json['artisanId'],
-      adminId: json['AdminID'] ?? json['adminId'],
-      moderatorId: json['ModeratorID'] ?? json['moderatorId'],
+      id: json['id'],
+      content: json['content'],
+      isRead: json['isRead'] ?? false,
+      timestamp: DateTime.parse(json['timestamp']),
+      type: json['type'],
+      relatedId: json['relatedId'] ?? 0,
     );
-  }
-
-  String get formattedTime {
-    if (createdAt == null) return '';
-    final now = DateTime.now();
-    final diff = now.difference(createdAt!);
-
-    if (diff.inMinutes < 1) return "À l'instant";
-    if (diff.inMinutes < 60) return "Il y a ${diff.inMinutes} min";
-    if (diff.inHours < 24) return "Il y a ${diff.inHours}h";
-    if (diff.inDays < 7) return "Il y a ${diff.inDays}j";
-    return DateFormat('dd/MM/yyyy').format(createdAt!);
   }
 }

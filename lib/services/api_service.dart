@@ -8,7 +8,7 @@ class ApiService {
   // ============================================================
   // BASE URL - FOR ANDROID EMULATOR
   // ============================================================
-  static const String baseUrl = 'http://192.168.1.36:8081/api/v1';
+  static const String baseUrl = 'http://172.28.158.122:8081/api/v1';
   // FOR PHYSICAL DEVICE (uncomment and use your computer's IP):
   // static const String baseUrl = 'http://192.168.1.36:8081/api/v1';
 
@@ -1078,5 +1078,37 @@ class ApiService {
       'status': 'active',
       'requestDate': now,  // Reset the date so it's not expired
     });
+  }
+
+  // ============================================================
+// EVALUATION/RATING ENDPOINTS - ADD TO ApiService class
+// ============================================================
+
+// Get evaluation status for an appointment
+  static Future<Map<String, dynamic>> getAppointmentEvaluationStatus(int appointmentId) async {
+    debugPrint('📤 Getting evaluation status for appointment: $appointmentId');
+    final response = await get('/appointments/$appointmentId/evaluation-status');
+    return response;
+  }
+
+// Submit evaluation for an artisan
+  static Future<Map<String, dynamic>> submitEvaluation({
+    required int appointmentId,
+    required double rating,
+    required String comment,
+  }) async {
+    debugPrint('📤 Submitting evaluation for appointment: $appointmentId');
+    final response = await post('/appointments/$appointmentId/evaluate', {
+      'rating': rating,
+      'comment': comment,
+    });
+    return response;
+  }
+
+// Check if evaluation is still available (within 24 hours)
+  static Future<Map<String, dynamic>> checkEvaluationAvailability(int appointmentId) async {
+    debugPrint('📤 Checking evaluation availability for appointment: $appointmentId');
+    final response = await get('/appointments/$appointmentId/can-evaluate');
+    return response;
   }
 }

@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/message_controller.dart';
-import '../../models/message.dart';
+import '../../services/evaluation_service.dart';
+import '../../core/widgets/evaluation_dialog.dart';
 import '../../services/storage_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final int contactId;
   final String contactName;
+  final int? appointmentId; // ADD THIS - ID of the completed task
 
   const ChatScreen({
     super.key,
     required this.contactId,
     required this.contactName,
+    this.appointmentId, // Optional, only for completed tasks
   });
 
   @override
@@ -25,12 +28,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
   bool isArtisan = false;
   int currentUserId = 0;
+  bool _canEvaluate = false;
+  bool _alreadyEvaluated = false;
+  int _remainingHours = 0;
+  bool _isLoadingEvaluation = true;
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
     controller.fetchMessages(widget.contactId);
+    if (widget.appointmentId != null) {
+      _checkEvaluationStatus();
+    }
   }
 
   Future<void> _loadUserInfo() async {
@@ -41,6 +51,91 @@ class _ChatScreenState extends State<ChatScreen> {
       isArtisan = role == 'artisan';
       currentUserId = user?['ID'] ?? user?['id'] ?? 0;
     });
+  }
+
+  Future<void> _checkEvaluationStatus() async {
+    if (widget.appointmentId == null) {
+      setState(() => _isLoadingEvaluation = false);
+      return;
+    }
+
+    setState(() => _isLoadingEvaluation = true);
+
+    try {
+      final canEvaluate = await EvaluationService.canEvaluate(widget.appointmentId!);
+      final alreadyEvaluated = await EvaluationService.isAlreadyEvaluated(widget.appointmentId!);
+      final remainingHours = await EvaluationService.getRemainingHours(widget.appointmentId!);
+
+      setState(() {
+        _canEvaluate = canEvaluate && !alreadyEvaluated;
+        _alreadyEvaluated = alreadyEvaluated;
+        _remainingHours = remainingHours;
+        _isLoadingEvaluation = false;
+      });
+    } catch (e) {
+      debugPrint('Error checking evaluation status: $e');
+      setState(() => _isLoadingEvaluation = false);
+    }
+  }
+
+  void _showEvaluationDialog() {
+    if (!_canEvaluate) {
+      if (_alreadyEvaluated) {
+        Get.snackbar(
+          'Déjà évalué',
+          'Vous avez déjà évalué cet artisan pour cette prestation.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      } else if (_remainingHours <= 0) {
+        Get.snackbar(
+          'Délai expiré',
+          'Vous ne pouvez plus évaluer cette prestation car le délai de 24 heures est dépassé.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => EvaluationDialog(
+        artisanName: widget.contactName,
+        artisanId: widget.contactId,
+        appointmentId: widget.appointmentId!,
+        onSubmit: _submitEvaluation,
+      ),
+    );
+  }
+
+  Future<void> _submitEvaluation(double rating, String comment) async {
+    if (widget.appointmentId == null) return;
+
+    final success = await EvaluationService.submitEvaluation(
+      appointmentId: widget.appointmentId!,
+      rating: rating,
+      comment: comment,
+    );
+
+    if (success) {
+      Get.snackbar(
+        'Merci !',
+        'Votre évaluation a été enregistrée avec succès.',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+      await _checkEvaluationStatus(); // Refresh status
+    } else {
+      Get.snackbar(
+        'Erreur',
+        'Impossible d\'enregistrer votre évaluation. Veuillez réessayer.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 
   void _scrollToBottom() {
@@ -87,6 +182,11 @@ class _ChatScreenState extends State<ChatScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Get.back(),
         ),
+        // ADD THE "TASK ENDED" BUTTON FOR CLIENTS ONLY
+        actions: [
+          if (!isArtisan && widget.appointmentId != null)
+            _buildTaskEndedButton(),
+        ],
       ),
       body: Column(
         children: [
@@ -197,6 +297,41 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTaskEndedButton() {
+    if (_isLoadingEvaluation) {
+      return Container(
+        margin: const EdgeInsets.only(right: 16),
+        width: 40,
+        height: 40,
+        child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(right: 16),
+      child: ElevatedButton.icon(
+        onPressed: _showEvaluationDialog,
+        icon: Icon(
+          _alreadyEvaluated ? Icons.star : Icons.star_border,
+          color: Colors.white,
+          size: 18,
+        ),
+        label: Text(
+          _alreadyEvaluated ? 'Déjà évalué' : 'Évaluer',
+          style: const TextStyle(fontSize: 12),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _alreadyEvaluated ? Colors.grey : Colors.amber,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
       ),
     );
   }

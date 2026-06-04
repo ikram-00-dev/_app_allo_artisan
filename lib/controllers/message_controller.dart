@@ -1,37 +1,67 @@
-import 'package:flutter/material.dart';
+// lib/controllers/message_controller.dart
 import 'package:get/get.dart';
-import '../services/api_service.dart';
 import '../models/message.dart';
-import '../services/storage_service.dart';
+import '../services/api_service.dart';
+import 'package:flutter/foundation.dart';
 
 class MessageController extends GetxController {
-  var isLoading = false.obs;
   var messages = <Message>[].obs;
-  var selectedMessage = Rxn<Message>();
-  var currentUserId = 0.obs;
+  var isLoading = false.obs;
 
   @override
   void onInit() {
     super.onInit();
-    loadCurrentUserId();
+    loadStaticMessages();
   }
 
-  Future<void> loadCurrentUserId() async {
-    try {
-      final user = await ApiService.getCurrentUser();
-      currentUserId.value = user['ID'] ?? user['id'] ?? 0;
-    } catch (e) {
-      print('Error loading user id: $e');
-    }
+  void loadStaticMessages() {
+    // Add some static messages for demonstration
+    messages.value = [
+      Message(
+        id: 1,
+        contactId: 101,
+        senderId: 101,
+        text: 'Bonjour, je suis intéressé par vos services',
+        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+        seen: true,
+      ),
+      Message(
+        id: 2,
+        contactId: 101,
+        senderId: 0, // Current user
+        text: 'Bonjour! Je serais ravi de vous aider. Quel est votre besoin?',
+        createdAt: DateTime.now().subtract(const Duration(hours: 1, minutes: 50)),
+        seen: true,
+      ),
+      Message(
+        id: 3,
+        contactId: 101,
+        senderId: 101,
+        text: 'J\'ai une fuite d\'eau dans ma salle de bain',
+        createdAt: DateTime.now().subtract(const Duration(hours: 1, minutes: 45)),
+        seen: true,
+      ),
+      Message(
+        id: 4,
+        contactId: 102,
+        senderId: 102,
+        text: 'Besoin d\'un électricien pour installation',
+        createdAt: DateTime.now().subtract(const Duration(days: 1)),
+        seen: false,
+      ),
+    ];
   }
 
   Future<void> fetchMessages(int contactId) async {
     try {
       isLoading.value = true;
-      final res = await ApiService.getMessages(contactId);
-      messages.value = (res as List).map((e) => Message.fromJson(e)).toList();
+      // For static demo, just filter existing messages
+      // In production, you would call API
+      // final response = await ApiService.getMessages(contactId);
+      // messages.value = (response as List).map((json) => Message.fromJson(json)).toList();
+      await Future.delayed(const Duration(milliseconds: 500));
     } catch (e) {
-      Get.snackbar("Error", "Failed to load messages");
+      debugPrint('Error fetching messages: $e');
     } finally {
       isLoading.value = false;
     }
@@ -43,23 +73,61 @@ class MessageController extends GetxController {
     required bool isSentByArtisan,
   }) async {
     try {
-      final data = {
-        'text': text,
-        'contactId': contactId,
-        'senderId': currentUserId.value,
-        'seen': false,
-      };
+      isLoading.value = true;
 
-      final response = await ApiService.sendMessage(data);
-      final newMessage = Message.fromJson(response);
+      final newMessage = Message(
+        id: DateTime.now().millisecondsSinceEpoch,
+        contactId: contactId,
+        senderId: isSentByArtisan ? 0 : contactId, // Simplified for demo
+        text: text,
+        createdAt: DateTime.now(),
+        seen: false,
+      );
+
       messages.add(newMessage);
+
+      // In production, call API
+      // await ApiService.sendMessage({
+      //   'text': text,
+      //   'contactId': contactId,
+      // });
     } catch (e) {
-      Get.snackbar("Erreur", "Impossible d'envoyer le message");
+      debugPrint('Error sending message: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  void clear() {
-    messages.clear();
-    selectedMessage.value = null;
+  void addStaticMessage({
+    required String text,
+    required bool isMe,
+    required int contactId,
+    required DateTime time,
+    required bool seen,
+  }) {
+    final newMessage = Message(
+      id: DateTime.now().millisecondsSinceEpoch,
+      contactId: contactId,
+      senderId: isMe ? 0 : contactId,
+      text: text,
+      createdAt: time,
+      seen: seen,
+    );
+    messages.add(newMessage);
+  }
+
+  void markAsRead(int messageId) {
+    final index = messages.indexWhere((m) => m.id == messageId);
+    if (index != -1) {
+      messages[index] = Message(
+        id: messages[index].id,
+        contactId: messages[index].contactId,
+        senderId: messages[index].senderId,
+        text: messages[index].text,
+        createdAt: messages[index].createdAt,
+        seen: true,
+      );
+      messages.refresh();
+    }
   }
 }

@@ -1,9 +1,6 @@
 // lib/screens/shared/reservations_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
-import '../../controllers/reservation_controller.dart';
-import '../../models/appointment.dart';
 import 'package:allo_artisan_gpt/core/widgets/bottom_nav_bar.dart';
 import '../../routes/app_routes.dart';
 import '../../controllers/auth_controller.dart';
@@ -11,28 +8,31 @@ import '../../controllers/auth_controller.dart';
 class ReservationScreen extends StatelessWidget {
   ReservationScreen({super.key});
 
-  final ReservationController controller = Get.put(ReservationController());
   final AuthController authController = Get.find<AuthController>();
 
-  // Mock data for when backend is not available
-  final List<Map<String, dynamic>> mockReservations = [
+  // STATIC RESERVATIONS DATA
+  final RxList<Map<String, dynamic>> reservations = <Map<String, dynamic>>[
     {
       'id': '1',
-      'artisan': 'Jean Dupont',
+      'clientName': 'Karim B.',
+      'artisanName': 'Moi (Artisan)',
       'category': 'Plomberie',
       'date': '15 Mai 2026',
       'time': '14:00',
       'status': 'waiting',
+      'address': 'Alger Centre',
     },
     {
       'id': '2',
-      'artisan': 'Sophie Martin',
+      'clientName': 'Nadia L.',
+      'artisanName': 'Moi (Artisan)',
       'category': 'Électricité',
       'date': '18 Mai 2026',
       'time': '10:00',
       'status': 'confirmed',
+      'address': 'Hydra',
     },
-  ];
+  ].obs;
 
   Color statusColor(String status) {
     if (status == 'waiting') return Colors.orange;
@@ -50,10 +50,77 @@ class ReservationScreen extends StatelessWidget {
     return status.toUpperCase();
   }
 
+  void _cancelReservation(int index) {
+    showDialog(
+      context: Get.context!,
+      builder: (context) => AlertDialog(
+        title: const Text('Annuler la réservation'),
+        content: const Text('Êtes-vous sûr de vouloir annuler cette réservation ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Non')),
+          TextButton(
+            onPressed: () {
+              reservations[index]['status'] = 'cancelled';
+              reservations.refresh();
+              Navigator.pop(context);
+              Get.snackbar('Succès', 'Réservation annulée', backgroundColor: Colors.green, colorText: Colors.white);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Oui'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmReservation(int index) {
+    showDialog(
+      context: Get.context!,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmer la réservation'),
+        content: const Text('Confirmez-vous cette réservation ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () {
+              reservations[index]['status'] = 'confirmed';
+              reservations.refresh();
+              Navigator.pop(context);
+              Get.snackbar('Succès', 'Réservation confirmée', backgroundColor: Colors.green, colorText: Colors.white);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.green),
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _completeReservation(int index) {
+    showDialog(
+      context: Get.context!,
+      builder: (context) => AlertDialog(
+        title: const Text('Terminer la prestation'),
+        content: const Text('La prestation est-elle terminée ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () {
+              reservations[index]['status'] = 'completed';
+              reservations.refresh();
+              Navigator.pop(context);
+              Get.snackbar('Succès', 'Prestation terminée', backgroundColor: Colors.green, colorText: Colors.white);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.blue),
+            child: const Text('Terminer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Use mock data for now since backend might not have appointments
-    final reservations = mockReservations;
     final isArtisan = authController.isArtisan;
 
     return Scaffold(
@@ -63,7 +130,6 @@ class ReservationScreen extends StatelessWidget {
         foregroundColor: Colors.black,
         elevation: 0,
         automaticallyImplyLeading: false,
-        // Add back button to return to Artisan Home
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
@@ -78,7 +144,7 @@ class ReservationScreen extends StatelessWidget {
       ),
       backgroundColor: Colors.grey.shade50,
       bottomNavigationBar: const BottomNavBar(currentIndex: 1),
-      body: reservations.isEmpty
+      body: Obx(() => reservations.isEmpty
           ? const Center(
         child: Padding(
           padding: EdgeInsets.all(32),
@@ -87,10 +153,7 @@ class ReservationScreen extends StatelessWidget {
             children: [
               Icon(Icons.calendar_today, size: 64, color: Colors.grey),
               SizedBox(height: 16),
-              Text(
-                'Aucune réservation',
-                style: TextStyle(color: Colors.grey),
-              ),
+              Text('Aucune réservation', style: TextStyle(color: Colors.grey)),
             ],
           ),
         ),
@@ -101,6 +164,9 @@ class ReservationScreen extends StatelessWidget {
         itemBuilder: (context, index) {
           final reservation = reservations[index];
           final isWaiting = reservation['status'] == 'waiting';
+          final isConfirmed = reservation['status'] == 'confirmed';
+          final isCompleted = reservation['status'] == 'completed';
+          final isCancelled = reservation['status'] == 'cancelled';
           final status = reservation['status'] as String;
 
           return Container(
@@ -121,41 +187,26 @@ class ReservationScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isWaiting
-                            ? Colors.orange.shade100
-                            : Colors.green.shade100,
+                        color: statusColor(status).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         statusLabel(status),
-                        style: TextStyle(
-                          color: statusColor(status),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(color: statusColor(status), fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
                     Text(
                       reservation['category']!,
-                      style: TextStyle(
-                        color: Colors.blue.shade600,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TextStyle(color: Colors.blue.shade600, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  reservation['artisan']!,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  isArtisan ? reservation['clientName']! : reservation['artisanName']!,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -169,29 +220,27 @@ class ReservationScreen extends StatelessWidget {
                     Text(reservation['time']!),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(reservation['address']!),
+                  ],
+                ),
                 if (isWaiting) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          color: Colors.orange,
-                          size: 20,
-                        ),
+                    decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(8)),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'En attente de confirmation. Sera supprimée automatiquement si non confirmée.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange,
-                            ),
+                            style: TextStyle(fontSize: 12, color: Colors.orange),
                           ),
                         ),
                       ],
@@ -201,72 +250,64 @@ class ReservationScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Annuler la réservation'),
-                              content: const Text(
-                                'Êtes-vous sûr de vouloir annuler cette réservation ?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('Non'),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    Get.snackbar(
-                                      'Succès',
-                                      'Réservation annulée',
-                                      backgroundColor: Colors.green,
-                                      colorText: Colors.white,
-                                    );
-                                  },
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.red,
-                                  ),
-                                  child: const Text('Oui'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red),
+                    if (!isCompleted && !isCancelled) ...[
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _cancelReservation(index),
+                          style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
+                          child: const Text('Annuler'),
                         ),
-                        child: const Text('Annuler'),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Get.snackbar(
-                            'Info',
-                            'Message envoyé à l\'artisan',
-                            backgroundColor: const Color(0xFF2563EB),
-                            colorText: Colors.white,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
+                      const SizedBox(width: 8),
+                      if (isWaiting)
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _confirmReservation(index),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.white),
+                            child: const Text('Confirmer'),
+                          ),
                         ),
-                        child: const Text('Contacter'),
+                      if (isConfirmed)
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _completeReservation(index),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+                            child: const Text('Terminer'),
+                          ),
+                        ),
+                    ],
+                    if (isCompleted)
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Get.toNamed(
+                              AppRoutes.chat,
+                              arguments: {
+                                'contactId': reservation['clientName'] == 'Karim B.' ? 101 : 102,
+                                'contactName': reservation['clientName'],
+                                'appointmentId': int.parse(reservation['id']),
+                              },
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.white),
+                          child: const Text('Évaluer'),
+                        ),
                       ),
-                    ),
+                    if (isCancelled)
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          alignment: Alignment.center,
+                          child: const Text('Annulée', style: TextStyle(color: Colors.grey)),
+                        ),
+                      ),
                   ],
                 ),
               ],
             ),
           );
         },
-      ),
+      )),
     );
   }
 }

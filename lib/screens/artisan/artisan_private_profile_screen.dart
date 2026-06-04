@@ -12,7 +12,7 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get controllers (they should be already initialized in routes)
+    // Get controllers
     final controller = Get.find<ArtisanPrivateProfileController>();
     final artisanController = Get.find<ArtisanController>();
     final postController = Get.find<PostController>();
@@ -20,7 +20,7 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
     return Obx(() => Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Allo Artisan'),
+        title: const Text('Mon Profil'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
@@ -50,6 +50,10 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
               _buildProfileHeader(controller, artisanController),
               const SizedBox(height: 16),
 
+              // Informations professionnelles section
+              _buildProfessionalInfoCard(controller),
+              const SizedBox(height: 12),
+
               GestureDetector(
                 onTap: () => controller.showAvailability.toggle(),
                 child: _buildMenuCard(Icons.calendar_today, Colors.green, "Gérer mes disponibilités", "Modifier mon calendrier"),
@@ -66,23 +70,27 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              _buildCreatePostSection(controller, postController),
+              // ==================== CREATE POST SECTION - DYNAMIC ====================
+              _buildCreatePostSection(controller, postController, artisanController),
 
               const SizedBox(height: 24),
 
-              // ==================== MES PUBLICATIONS ====================
+              // ==================== MES PUBLICATIONS - DYNAMIC ====================
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text("Mes publications", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 12),
               Obx(() {
+                final currentArtisanId = artisanController.artisan.value?.id;
+
                 if (postController.isLoading.value && postController.posts.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
+                // Filter posts for current artisan only
                 final myPosts = postController.posts
-                    .where((post) => post.artisanId == artisanController.artisan.value?.id)
+                    .where((post) => post.artisanId == currentArtisanId)
                     .toList();
 
                 if (myPosts.isEmpty && !postController.isLoading.value) {
@@ -93,18 +101,35 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Center(
-                      child: Text(
-                        "Aucune publication pour le moment",
-                        style: TextStyle(color: Colors.grey),
+                      child: Column(
+                        children: [
+                          Icon(Icons.post_add, size: 48, color: Colors.grey),
+                          SizedBox(height: 12),
+                          Text(
+                            "Aucune publication pour le moment",
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            "Créez votre première publication ci-dessus",
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
                       ),
                     ),
                   );
                 }
-                return Column(
-                  children: myPosts.map((post) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _buildPublicationCard(post, artisanController, postController),
-                  )).toList(),
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: myPosts.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildPublicationCard(myPosts[index], artisanController, postController),
+                    );
+                  },
                 );
               }),
             ],
@@ -129,7 +154,15 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
               CircleAvatar(
                 radius: 32,
                 backgroundColor: const Color(0xFF2563EB),
-                child: Text(controller.getInitials(), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
+                backgroundImage: controller.getAvatarUrl().isNotEmpty
+                    ? NetworkImage(controller.getAvatarUrl())
+                    : null,
+                child: controller.getAvatarUrl().isEmpty
+                    ? Text(
+                    controller.getInitials(),
+                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)
+                )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -138,11 +171,18 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(controller.getFullName(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Expanded(
+                          child: Text(
+                            controller.getFullName(),
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                         const SizedBox(width: 6),
                         const Icon(Icons.verified, color: Color(0xFF2563EB), size: 20),
                       ],
                     ),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         Container(
@@ -151,9 +191,13 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
                           child: Text(controller.getCategory(), style: const TextStyle(color: Color(0xFF2563EB), fontSize: 13)),
                         ),
                         const SizedBox(width: 8),
-                        Row(children: [const Icon(Icons.star, color: Colors.amber, size: 18), Text(" ${controller.getRating()}", style: const TextStyle(fontWeight: FontWeight.bold))]),
+                        Row(children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 18),
+                          Text(" ${controller.getRating().toStringAsFixed(1)}", style: const TextStyle(fontWeight: FontWeight.bold))
+                        ]),
                       ],
                     ),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         const Icon(Icons.email, size: 16, color: Colors.grey),
@@ -161,6 +205,20 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
                         Expanded(
                           child: Text(
                             controller.getEmail(),
+                            style: const TextStyle(color: Colors.grey, fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(Icons.phone, size: 16, color: Colors.grey),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            controller.getPhoneNumber(),
                             style: const TextStyle(color: Colors.grey, fontSize: 13),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -226,6 +284,159 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
     ));
   }
 
+  // ==================== CREATE POST SECTION - DYNAMIC ====================
+  Widget _buildCreatePostSection(ArtisanPrivateProfileController controller, PostController postController, ArtisanController artisanController) {
+    final TextEditingController contentController = TextEditingController();
+    final RxBool isPosting = false.obs;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Créer une publication", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: contentController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: "Partagez votre dernier projet...",
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.all(12),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    // TODO: Implement image picker
+                    Get.snackbar("Info", "Fonctionnalité à venir",
+                        backgroundColor: Colors.orange,
+                        colorText: Colors.white
+                    );
+                  },
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: const Text("Ajouter une photo"),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Obx(() => ElevatedButton(
+                  onPressed: isPosting.value || contentController.text.trim().isEmpty
+                      ? null
+                      : () async {
+                    isPosting.value = true;
+
+                    final success = await postController.createPost(
+                      contentController.text.trim(),
+                      null, // Add image URL when implemented
+                    );
+
+                    isPosting.value = false;
+
+                    if (success) {
+                      contentController.clear();
+                      Get.snackbar(
+                        "Succès",
+                        "Publication créée avec succès!",
+                        backgroundColor: Colors.green,
+                        colorText: Colors.white,
+                        duration: const Duration(seconds: 2),
+                      );
+                    } else {
+                      Get.snackbar(
+                        "Erreur",
+                        "Impossible de créer la publication",
+                        backgroundColor: Colors.red,
+                        colorText: Colors.white,
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: isPosting.value
+                      ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                  )
+                      : const Text("Publier", style: TextStyle(color: Colors.white)),
+                )),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== PROFESSIONAL INFO CARD ====================
+  Widget _buildProfessionalInfoCard(ArtisanPrivateProfileController controller) {
+    return Obx(() => Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.work, size: 20, color: Color(0xFF2563EB)),
+              SizedBox(width: 8),
+              Text("Informations professionnelles", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.location_on, "Localisation", controller.getLocation()),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.flag, "Zone de service", controller.getServiceZone()),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.school, "Diplôme", controller.getDiploma()),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.timer, "Expérience", controller.getExperience()),
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.description, "Bio", controller.getBio()),
+        ],
+      ),
+    ));
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: Colors.grey),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 100,
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value.isEmpty ? "Non renseigné" : value,
+            style: const TextStyle(fontSize: 13, color: Colors.black87),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ==================== MENU CARD ====================
   Widget _buildMenuCard(IconData icon, Color color, String title, String subtitle) {
     return Container(
@@ -282,7 +493,6 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
 
     return Column(
       children: [
-        // Weekday headers
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: weekDays.map((day) => Expanded(
@@ -292,7 +502,6 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
           )).toList(),
         ),
         const SizedBox(height: 8),
-        // Calendar grid
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -394,80 +603,6 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  // ==================== CREATE POST ====================
-  Widget _buildCreatePostSection(ArtisanPrivateProfileController controller, PostController postController) {
-    return Obx(() => Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("Créer une publication", style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          TextField(
-            maxLines: 3,
-            onChanged: (value) => controller.postContent.value = value,
-            decoration: const InputDecoration(
-              hintText: "Partagez votre dernier projet...",
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // TODO: Implement image picker
-                    Get.snackbar("Info", "Fonctionnalité à venir");
-                  },
-                  icon: const Icon(Icons.add_photo_alternate_outlined),
-                  label: const Text("Ajouter une photo"),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    alignment: Alignment.center,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: controller.isCreatingPost.value ? null : () => _handleCreatePost(controller, postController),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: controller.isCreatingPost.value
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text("Publier", style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ));
-  }
-
-  Future<void> _handleCreatePost(ArtisanPrivateProfileController controller, PostController postController) async {
-    if (controller.postContent.value.trim().isEmpty) {
-      Get.snackbar("Erreur", "Veuillez écrire quelque chose");
-      return;
-    }
-
-    controller.isCreatingPost.value = true;
-    bool success = await postController.createPost(
-      controller.postContent.value.trim(),
-      null, // You can add image picker here later
-    );
-    controller.isCreatingPost.value = false;
-
-    if (success) {
-      controller.postContent.value = '';
-      Get.snackbar("Succès", "Publication créée avec succès!");
-    }
   }
 
   // ==================== MES PUBLICATIONS ====================
@@ -580,7 +715,6 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
               if (success) {
                 Get.snackbar('Succès', 'Publication modifiée');
                 await artisanController.loadDashboard();
-                await postController.fetchAllPosts();
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
@@ -605,7 +739,6 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
                 if (success) {
                   Get.snackbar('Succès', 'Publication supprimée');
                   await artisanController.loadDashboard();
-                  await postController.fetchAllPosts();
                 }
               }
             },
@@ -650,7 +783,7 @@ class ArtisanPrivateProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Text("Partagez ce code avec vos clients\nID: $qrData", textAlign: TextAlign.center),
+          Text("Partagez ce code avec vos clients\n$qrData", textAlign: TextAlign.center),
         ],
       ),
       actions: [TextButton(onPressed: () => Get.back(), child: const Text("Fermer"))],

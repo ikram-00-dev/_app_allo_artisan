@@ -10,6 +10,7 @@ import '../screens/artisan/artisan_private_profile_screen.dart';
 import '../screens/client/artisan_profile_screen.dart';
 import '../screens/client/search_screen.dart';
 import '../screens/shared/messages_screen.dart';
+import '../screens/shared/chat_screen.dart';
 import '../screens/shared/notifications_screen.dart';
 import '../screens/shared/reservations_screen.dart';
 import '../screens/shared/settings_screen.dart';
@@ -26,12 +27,10 @@ import '../screens/admin/admin_panel_screen.dart';
 import '../screens/admin/pending_artisans_screen.dart';
 import '../middleware/admin_middleware.dart';
 import '../middleware/auth_middleware.dart';
-import '../controllers/artisan_controller.dart'; // ADD THIS IMPORT
-import '../controllers/artisan_private_profile_controller.dart'; // ADD THIS IMPORT
-// Add this import at the top of app_pages.dart
+import '../controllers/artisan_controller.dart';
+import '../controllers/artisan_private_profile_controller.dart';
 import '../controllers/artisan_public_profile_controller.dart';
-import '../controllers/post_controller.dart'; // ADD THIS IMPORT
-
+import '../controllers/post_controller.dart';
 
 class AppPages {
   // Helper method to get profile screen based on role
@@ -118,10 +117,21 @@ class AppPages {
       middlewares: [AuthMiddleware()],
     ),
 
-    // Messages
+    // Messages - Use renamed class MessagesListScreen
     GetPage(
       name: AppRoutes.messages,
-      page: () => const MessagesScreen(),
+      page: () => const MessagesListScreen(),
+      middlewares: [AuthMiddleware()],
+    ),
+
+    // Chat Screen
+    GetPage(
+      name: AppRoutes.chat,
+      page: () => ChatScreen(
+        contactId: Get.arguments['contactId'] ?? 0,
+        contactName: Get.arguments['contactName'] ?? 'Contact',
+        appointmentId: Get.arguments['appointmentId'],
+      ),
       middlewares: [AuthMiddleware()],
     ),
 
@@ -185,12 +195,6 @@ class AppPages {
       name: AppRoutes.addModerator,
       page: () => const AddModeratorScreen(),
       middlewares: [AdminMiddleware()],
-    ),
-    // In app_pages.dart, update the artisanProfile route
-    GetPage(
-      name: AppRoutes.artisanProfile,
-      page: () => ArtisanProfileScreen(artisanId: Get.arguments),
-      middlewares: [AuthMiddleware()],
     ),
   ];
 }

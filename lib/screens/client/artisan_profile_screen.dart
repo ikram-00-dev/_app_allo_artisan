@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/artisan_controller.dart';
 import '../../controllers/artisan_public_profile_controller.dart';
+import '../../models/artisan.dart';
 
 class ArtisanProfileScreen extends StatelessWidget {
   final int? artisanId;
@@ -30,7 +31,7 @@ class ArtisanProfileScreen extends StatelessWidget {
       final artisan = artisanController.artisan.value;
       final isLoading = artisanController.isLoading.value;
 
-      if (isLoading) {
+      if (isLoading && artisan == null) {
         return _buildLoadingScreen();
       }
 
@@ -54,7 +55,7 @@ class ArtisanProfileScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              _buildHeader(controller),
+              _buildHeader(controller, artisan),
               const SizedBox(height: 16),
               _buildProfileButton(controller),
               if (controller.showProfileDetails.value) _buildProfileDetails(controller),
@@ -113,8 +114,42 @@ class ArtisanProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(ArtisanPublicProfileController controller) {
-    return Obx(() => Container(
+  // Helper to get initials (first letter of first name + first letter of last name)
+  String _getInitials(String firstName, String lastName) {
+    String firstInitial = firstName.isNotEmpty ? firstName[0].toUpperCase() : '';
+    String lastInitial = lastName.isNotEmpty ? lastName[0].toUpperCase() : '';
+    if (firstInitial.isNotEmpty && lastInitial.isNotEmpty) {
+      return '$firstInitial$lastInitial';
+    }
+    return firstInitial.isNotEmpty ? firstInitial : '?';
+  }
+
+  Widget _buildHeader(ArtisanPublicProfileController controller, Artisan artisan) {
+    // Safely extract firstName and lastName
+    String firstName = '';
+    String lastName = '';
+
+    if (artisan.user != null) {
+      firstName = artisan.user.firstName ?? '';
+      lastName = artisan.user.lastName ?? '';
+    }
+
+    // If user object doesn't have firstName/lastName, try direct properties
+    if (firstName.isEmpty) {
+      firstName = (artisan as dynamic).firstName ?? '';
+    }
+    if (lastName.isEmpty) {
+      lastName = (artisan as dynamic).lastName ?? '';
+    }
+
+    String initials = _getInitials(firstName, lastName);
+
+    // If still no initials, use full name
+    if (initials == '?') {
+      initials = controller.fullName.isNotEmpty ? controller.fullName[0].toUpperCase() : 'A';
+    }
+
+    return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
       child: Column(
@@ -124,10 +159,10 @@ class ArtisanProfileScreen extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 35,
-                backgroundColor: Colors.blue.shade100,
+                backgroundColor: const Color(0xFF2563EB),
                 child: Text(
-                  controller.getInitials(),
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                  initials,
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ),
               const SizedBox(width: 14),
@@ -154,7 +189,7 @@ class ArtisanProfileScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
+                              color: Colors.blue.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10)
                           ),
                           child: Text(
@@ -185,7 +220,7 @@ class ArtisanProfileScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                           decoration: BoxDecoration(
-                            color: controller.statusColor.withOpacity(0.15),
+                            color: controller.statusColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -217,12 +252,12 @@ class ArtisanProfileScreen extends StatelessWidget {
               Expanded(
                 child: Obx(() => ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: controller.isFollowing ? Colors.grey[300] : Colors.green,
-                    foregroundColor: controller.isFollowing ? Colors.black : Colors.white,
+                    backgroundColor: controller.isFollowing.value ? Colors.grey[300] : Colors.green,
+                    foregroundColor: controller.isFollowing.value ? Colors.black : Colors.white,
                   ),
                   onPressed: () => controller.toggleFollow(),
-                  icon: Icon(controller.isFollowing ? Icons.check : Icons.person_add),
-                  label: Text(controller.isFollowing ? "Suivi" : "Suivre"),
+                  icon: Icon(controller.isFollowing.value ? Icons.check : Icons.person_add),
+                  label: Text(controller.isFollowing.value ? "Suivi" : "Suivre"),
                 )),
               ),
               const SizedBox(width: 10),
@@ -241,11 +276,11 @@ class ArtisanProfileScreen extends StatelessWidget {
           ),
         ],
       ),
-    ));
+    );
   }
 
   Widget _buildProfileDetails(ArtisanPublicProfileController controller) {
-    return Obx(() => Container(
+    return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(20),
@@ -255,12 +290,13 @@ class ArtisanProfileScreen extends StatelessWidget {
         children: [
           const Text("À propos", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 10),
-          Text(controller.bio, style: const TextStyle(height: 1.5, color: Colors.black87)),
+          Text(controller.bio.isNotEmpty ? controller.bio : "Aucune description",
+              style: const TextStyle(height: 1.5, color: Colors.black87)),
           const SizedBox(height: 24),
 
           Row(
             children: [
-              Expanded(child: _infoCard("Diplôme", controller.diploma)),
+              Expanded(child: _infoCard("Diplôme", controller.diploma.isNotEmpty ? controller.diploma : "Non renseigné")),
               const SizedBox(width: 12),
               Expanded(child: _infoCard("Statut", controller.statusText)),
             ],
@@ -268,7 +304,7 @@ class ArtisanProfileScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _infoCard("Expérience", "${controller.experience} ans")),
+              Expanded(child: _infoCard("Expérience", controller.experience > 0 ? "${controller.experience} ans" : "Non renseignée")),
               const SizedBox(width: 12),
               Expanded(child: _infoCard("Note", controller.rating.toStringAsFixed(1))),
             ],
@@ -293,7 +329,7 @@ class ArtisanProfileScreen extends StatelessWidget {
           ),
         ],
       ),
-    ));
+    );
   }
 
   Widget _infoCard(String title, String value) {
@@ -330,7 +366,7 @@ class ArtisanProfileScreen extends StatelessWidget {
             Container(
               width: 50,
               height: 50,
-              decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
               child: const Icon(Icons.info, color: Colors.blue),
             ),
             const SizedBox(width: 14),
@@ -362,7 +398,7 @@ class ArtisanProfileScreen extends StatelessWidget {
             Container(
               width: 50,
               height: 50,
-              decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
               child: const Icon(Icons.calendar_month, color: Colors.green),
             ),
             const SizedBox(width: 14),
@@ -426,7 +462,7 @@ class ArtisanProfileScreen extends StatelessWidget {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: available ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
+                    color: available ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(

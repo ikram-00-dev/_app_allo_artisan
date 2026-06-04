@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/post_controller.dart';
 import '../../controllers/auth_controller.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import '../../services/api_service.dart';
 
 class SharePostModal extends StatefulWidget {
   final VoidCallback? onPostCreated;
@@ -17,10 +20,53 @@ class _SharePostModalState extends State<SharePostModal> {
   final PostController postController = Get.find<PostController>();
   final AuthController authController = Get.find<AuthController>();
   final TextEditingController descriptionController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
+
+  File? _selectedImage;
+  bool _isUploadingImage = false;
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+
+        // Upload image to get URL
+        setState(() => _isUploadingImage = true);
+        try {
+          final imageUrl = await ApiService.uploadImage(pickedFile.path);
+          postController.setPostImage(imageUrl);
+        } catch (e) {
+          debugPrint('Error uploading image: $e');
+          Get.snackbar('Erreur', 'Impossible de télécharger l\'image');
+        } finally {
+          setState(() => _isUploadingImage = false);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
+    postController.setPostImage(null);
+  }
 
   @override
   void dispose() {
     descriptionController.dispose();
+    postController.clearNewPost();
     super.dispose();
   }
 
@@ -125,7 +171,18 @@ class _SharePostModalState extends State<SharePostModal> {
                 borderRadius: BorderRadius.circular(12),
                 color: Colors.grey.shade50,
               ),
-              child: postController.postImage.value != null
+              child: _isUploadingImage
+                  ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 8),
+                    Text("Téléchargement..."),
+                  ],
+                ),
+              )
+                  : postController.postImage.value != null
                   ? Stack(
                 fit: StackFit.expand,
                 children: [
@@ -141,11 +198,11 @@ class _SharePostModalState extends State<SharePostModal> {
                     top: 8,
                     right: 8,
                     child: GestureDetector(
-                      onTap: () => postController.postImage.value = null,
+                      onTap: _removeImage,
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
+                          color: Colors.black.withValues(alpha: 0.6),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.close, size: 16, color: Colors.white),
@@ -155,20 +212,23 @@ class _SharePostModalState extends State<SharePostModal> {
                 ],
               )
                   : Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey.shade600),
-                    const SizedBox(height: 8),
-                    const Text(
-                      "Ajouter une photo",
-                      style: TextStyle(color: Colors.black54),
-                    ),
-                    const Text(
-                      "JPG, PNG - Max 5MB",
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey.shade600),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Ajouter une photo",
+                        style: TextStyle(color: Colors.black54),
+                      ),
+                      const Text(
+                        "JPG, PNG - Max 5MB",
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             )),
@@ -190,7 +250,7 @@ class _SharePostModalState extends State<SharePostModal> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Obx(() => ElevatedButton(
-                    onPressed: postController.isCreating.value
+                    onPressed: postController.isCreating.value || descriptionController.text.trim().isEmpty
                         ? null
                         : () => _handleCreatePost(),
                     style: ElevatedButton.styleFrom(
@@ -220,16 +280,25 @@ class _SharePostModalState extends State<SharePostModal> {
 
   String _getInitials() {
     final user = authController.user.value;
-    final username = user?['username'] ?? user?['Username'] ?? 'Artisan';
-    List<String> parts = username.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    final firstName = user?['firstName'] ?? '';
+    final lastName = user?['lastName'] ?? '';
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '${firstName[0]}${lastName[0]}'.toUpperCase();
     }
-    return username.isNotEmpty ? username[0].toUpperCase() : 'A';
+    final username = user?['username'] ?? user?['Username'] ?? 'Artisan';
+    if (username.isNotEmpty) {
+      return username[0].toUpperCase();
+    }
+    return 'A';
   }
 
   String _getFullName() {
     final user = authController.user.value;
+    final firstName = user?['firstName'] ?? '';
+    final lastName = user?['lastName'] ?? '';
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '$firstName $lastName';
+    }
     return user?['username'] ?? user?['Username'] ?? 'Artisan';
   }
 
@@ -250,7 +319,7 @@ class _SharePostModalState extends State<SharePostModal> {
     );
 
     if (success) {
-      postController.clearNewPost();
+      descriptionController.clear();
       Get.back();
 
       Get.snackbar(
@@ -266,3 +335,4 @@ class _SharePostModalState extends State<SharePostModal> {
     }
   }
 }
+

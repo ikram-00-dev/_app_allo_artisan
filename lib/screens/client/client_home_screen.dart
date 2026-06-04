@@ -13,7 +13,7 @@ import 'package:allo_artisan_gpt/models/post.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:allo_artisan_gpt/services/storage_service.dart';
-
+import '../client/artisan_profile_screen.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -94,9 +94,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   // Navigate to Artisan Profile
   void _goToArtisanProfile(int artisanId) {
     if (artisanId > 0) {
-      Get.to(() => ArtisanProfileScreen(artisanId: artisanId));
-    }
-  }
+      Get.toNamed(AppRoutes.artisanProfile, arguments: artisanId);
+
+  }}
 
   // Helper method to get initials from name
   String _getInitials(String name) {

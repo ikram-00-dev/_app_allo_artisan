@@ -70,49 +70,92 @@ class ArtisanPrivateProfileController extends GetxController {
     );
   }
 
-  Future<void> createPost() async {
-    if (postContent.value.trim().isEmpty) {
-      Get.snackbar("Erreur", "Veuillez écrire quelque chose");
-      return;
-    }
-
-    isCreatingPost.value = true;
-    bool success = await artisanController.createPost(
-      postContent.value.trim(),
-      null, // You can add image picker here later
-    );
-    isCreatingPost.value = false;
-
-    if (success) {
-      postContent.value = '';
-    }
-  }
-
+  // DYNAMIC - Get initials from registered artisan
   String getInitials() {
     if (artisanController.artisan.value == null) return "?";
-    final firstName = artisanController.artisan.value!.user.firstName?? "";
-    final lastName = artisanController.artisan.value!.user.lastName ?? "";
+    final firstName = artisanController.artisan.value!.user.firstName ??
+        artisanController.artisan.value!.user.firstName ?? '';
+    final lastName = artisanController.artisan.value!.user.lastName ??
+        artisanController.artisan.value!.user.lastName?? '';
     if (firstName.isNotEmpty && lastName.isNotEmpty) {
       return "${firstName[0]}${lastName[0]}".toUpperCase();
     }
-    return firstName.isNotEmpty ? firstName[0].toUpperCase() : "?";
+    if (firstName.isNotEmpty) return firstName[0].toUpperCase();
+    if (lastName.isNotEmpty) return lastName[0].toUpperCase();
+    return "?";
   }
 
+  // DYNAMIC - Get full name from registered artisan
   String getFullName() {
     if (artisanController.artisan.value == null) return "Chargement...";
-    return "${artisanController.artisan.value!.user.firstName ?? ''} ${artisanController.artisan.value!.user.lastName ?? ''}".trim();
+    final firstName = artisanController.artisan.value!.user.firstName ??
+        artisanController.artisan.value!.user.firstName ?? '';
+    final lastName = artisanController.artisan.value!.user.lastName ??
+        artisanController.artisan.value!.user.lastName ?? '';
+    return "$firstName $lastName".trim();
   }
 
+  // DYNAMIC - Get category from registered artisan
   String getCategory() {
     return artisanController.artisan.value?.category ?? "Artisan";
   }
 
+  // DYNAMIC - Get rating from registered artisan
   double getRating() {
-    return artisanController.artisan.value?.rating ?? 4.5;
+    return artisanController.artisan.value?.rating ?? 0.0;
   }
 
+  // DYNAMIC - Get email from registered artisan
   String getEmail() {
-    return artisanController.artisan.value?.email ?? "email@exemple.com";
+    return artisanController.artisan.value?.user.email ??
+        artisanController.artisan.value?.email ??
+        "email@exemple.com";
+  }
+
+  // DYNAMIC - Get phone number from registered artisan
+  String getPhoneNumber() {
+    return artisanController.artisan.value?.user.phoneNumber ??
+        artisanController.artisan.value?.user.phoneNumber ??
+        "Non renseigné";
+  }
+
+  // DYNAMIC - Get bio from registered artisan
+  String getBio() {
+    return artisanController.artisan.value?.bio ?? "Aucune bio pour le moment";
+  }
+
+  // DYNAMIC - Get experience from registered artisan
+  String getExperience() {
+    final exp = artisanController.artisan.value?.experience ?? 0;
+    if (exp == 0) return "Non renseignée";
+    if (exp == 1) return "1 an";
+    return "$exp ans";
+  }
+
+  // DYNAMIC - Get diploma from registered artisan
+  String getDiploma() {
+    return artisanController.artisan.value?.diploma ?? "Non renseigné";
+  }
+
+  // DYNAMIC - Get location (city + province)
+  String getLocation() {
+    final city = artisanController.artisan.value?.city ?? "";
+    final province = artisanController.artisan.value?.province ?? "";
+    if (city.isNotEmpty && province.isNotEmpty) return "$city, $province";
+    if (city.isNotEmpty) return city;
+    if (province.isNotEmpty) return province;
+    return "Localisation non renseignée";
+  }
+
+  // DYNAMIC - Get service zone
+  String getServiceZone() {
+    return artisanController.artisan.value?.district ?? "5km";
+  }
+
+  // DYNAMIC - Get avatar URL
+  String getAvatarUrl() {
+    return artisanController.artisan.value?.user.avatarUrl ??
+        artisanController.artisan.value?.avatarUrl ?? '';
   }
 
   int getFollowersCount() {

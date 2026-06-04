@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 // Import controllers and screens
 import 'package:allo_artisan_gpt/controllers/auth_controller.dart';
 import 'package:allo_artisan_gpt/controllers/notification_controller.dart';
-import 'package:allo_artisan_gpt/screens/client/client_requests_screen.dart';
 import 'package:allo_artisan_gpt/routes/app_routes.dart';
 
 class BottomNavBar extends StatelessWidget {
@@ -19,6 +18,7 @@ class BottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final AuthController authController = Get.find<AuthController>();
     final NotificationController notificationController = Get.find<NotificationController>();
+    final unreadCount = notificationController.unreadCount;
 
     return Obx(() => BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
@@ -85,7 +85,7 @@ class BottomNavBar extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               const Icon(Icons.notifications_outlined),
-              if (notificationController.unreadCount.value > 0)
+              if (unreadCount > 0) // Fixed: removed .value
                 Positioned(
                   right: -4,
                   top: -4,
@@ -100,9 +100,7 @@ class BottomNavBar extends StatelessWidget {
                       minHeight: 18,
                     ),
                     child: Text(
-                      notificationController.unreadCount.value > 99
-                          ? '99+'
-                          : '${notificationController.unreadCount.value}',
+                      unreadCount > 99 ? '99+' : '$unreadCount', // Fixed: removed .value
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
@@ -118,7 +116,7 @@ class BottomNavBar extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               const Icon(Icons.notifications),
-              if (notificationController.unreadCount.value > 0)
+              if (unreadCount > 0) // Fixed: removed .value
                 Positioned(
                   right: -4,
                   top: -4,
@@ -133,9 +131,7 @@ class BottomNavBar extends StatelessWidget {
                       minHeight: 18,
                     ),
                     child: Text(
-                      notificationController.unreadCount.value > 99
-                          ? '99+'
-                          : '${notificationController.unreadCount.value}',
+                      unreadCount > 99 ? '99+' : '$unreadCount', // Fixed: removed .value
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,

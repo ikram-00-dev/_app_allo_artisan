@@ -1,9 +1,9 @@
 // screens/notifications_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import '../../controllers/notification_controller.dart';
-import '../../routes/app_routes.dart';
+import '../../core/widgets/bottom_nav_bar.dart';
+import '../../controllers/auth_controller.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -11,6 +11,8 @@ class NotificationsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final NotificationController controller = Get.find<NotificationController>();
+    final AuthController authController = Get.find<AuthController>();
+    final isArtisan = authController.isArtisan;
 
     return Scaffold(
       appBar: AppBar(
@@ -18,9 +20,13 @@ class NotificationsScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Get.back(),
+        ),
         actions: [
           Obx(() {
-            if (controller.unreadCount.value > 0) {
+            if (controller.unreadCount > 0) {
               return IconButton(
                 icon: const Icon(Icons.done_all),
                 onPressed: () => controller.markAllAsRead(),
@@ -32,6 +38,7 @@ class NotificationsScreen extends StatelessWidget {
         ],
       ),
       backgroundColor: Colors.grey.shade50,
+      bottomNavigationBar: const BottomNavBar(currentIndex: 3),
       body: Obx(() {
         if (controller.isLoading.value && controller.notifications.isEmpty) {
           return const Center(child: CircularProgressIndicator());
@@ -154,6 +161,9 @@ class NotificationsScreen extends StatelessWidget {
     } else if (content.contains('message')) {
       icon = Icons.message;
       color = Colors.blue;
+    } else if (content.contains('évaluation') || content.contains('evaluation')) {
+      icon = Icons.star;
+      color = Colors.amber;
     } else {
       icon = Icons.notifications;
       color = Colors.orange;
@@ -173,7 +183,8 @@ class NotificationsScreen extends StatelessWidget {
     if (content.contains('urgente')) return '🚨 Demande urgente';
     if (content.contains('accepté')) return '✅ Demande acceptée';
     if (content.contains('message')) return '💬 Nouveau message';
-    return 'Notification';
+    if (content.contains('évaluation') || content.contains('evaluation')) return '⭐ Nouvelle évaluation';
+    return '📢 Notification';
   }
 
   String _getNotificationBody(String content) {
